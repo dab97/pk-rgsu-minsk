@@ -20,6 +20,8 @@ export type DirectionRow = {
   points?: number;
   hasOriginal?: boolean;
   isCurrent?: boolean;
+  priority?: number;
+  passingScore?: number | null;
 };
 
 export type DashboardStats = {

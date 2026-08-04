@@ -142,7 +142,7 @@ export function MyPositionModal({
                           {(['Бюджет', 'Платное'] as const).map(basis => {
                             const groupRows = meAcrossDirections
                               .filter(r => r.state === 'found' && r.comp.basis === basis)
-                              .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+                              .sort((a, b) => (a.priority ?? 999) - (b.priority ?? 999));
                             if (groupRows.length === 0) return null;
                             const isBudget = basis === 'Бюджет';
                             return (
@@ -157,6 +157,7 @@ export function MyPositionModal({
                                     <table className="w-full text-xs">
                                       <thead className={cn("text-slate-500 dark:text-slate-400 sticky top-0 z-10", isBudget ? "bg-teal-50/80 dark:bg-teal-900/30" : "bg-amber-50/80 dark:bg-amber-900/30")}>
                                         <tr>
+                                          <th className="px-3 py-2 text-left font-medium">Приоритет</th>
                                           <th className="px-3 py-2 text-left font-medium">Направление</th>
                                           <th className="px-3 py-2 text-right font-medium">Место</th>
                                           <th className="px-3 py-2 text-right font-medium">Баллы</th>
@@ -165,6 +166,9 @@ export function MyPositionModal({
                                       <tbody>
                                         {groupRows.map(row => (
                                           <tr key={row.comp.id} className={cn("border-t border-slate-100 dark:border-slate-800", row.isCurrent && accent.sidebarActive)}>
+                                            <td className="px-3 py-2 tabular-nums text-slate-500 dark:text-slate-400">
+                                              {row.priority ?? '—'}
+                                            </td>
                                             <td className="px-3 py-2 font-medium text-slate-700 dark:text-slate-200">
                                               {row.comp.title.split(' — ')[1] || row.comp.title.split(' — ')[0]}
                                               <span className="ml-1 font-normal text-slate-400 dark:text-slate-500">{row.comp.studyForm}</span>

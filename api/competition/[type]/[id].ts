@@ -1,6 +1,40 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as cheerio from 'cheerio';
 
+const FETCH_TIMEOUT_MS = 50000;
+const RETRY_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 1000;
+
+async function fetchHtml(url: string): Promise<string> {
+  let lastError: any;
+  for (let attempt = 0; attempt <= RETRY_ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Referer': 'https://pk.rgsu.net/',
+          'Cache-Control': 'no-cache',
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch from RGSU: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.text();
+    } catch (error: any) {
+      lastError = error;
+      if (attempt < RETRY_ATTEMPTS) {
+        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { type, id } = req.query;
 
@@ -15,23 +49,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const url = `https://pk.rgsu.net/${type}/${id}`;
 
   try {
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
-      },
-      signal: AbortSignal.timeout(25000),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch from RGSU: ${response.status} ${response.statusText}`);
-    }
-
-    const html = await response.text();
+    const html = await fetchHtml(url);
     const $ = cheerio.load(html);
 
     const students: any[] = [];
+
+    let seats = 0;
+    $('.faculty-intro__card').each((i, el) => {
+      const caption = $(el).find('.faculty-intro__card-caption').text().trim();
+      if (/мест/i.test(caption)) {
+        const val = parseInt($(el).find('.faculty-intro__card-text').text().trim().replace(/\D/g, ''), 10);
+        if (!isNaN(val)) seats = val;
+      }
+    });
 
     const updMatch = $('.main-screen__text').text().trim().match(/Сведения\s+обновлены:\s*(.+)/i);
     const updatedAt = updMatch ? updMatch[1].trim() : null;
@@ -102,7 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=60');
-    return res.json({ success: true, data: students, updatedAt });
+    return res.json({ success: true, data: students, updatedAt, seats });
   } catch (error: any) {
     console.error('Error fetching competition data:', error.message);
     return res.status(500).json({

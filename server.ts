@@ -10,6 +10,7 @@ const CACHE_TTL_MS = 3 * 60 * 1000; // 3 минуты
 interface CacheEntry {
   data: any[];
   updatedAt: string | null;
+  seats: number;
   fetchedAt: number;
 }
 
@@ -48,6 +49,15 @@ async function fetchAndParse(type: string, id: string): Promise<CacheEntry> {
   const html = await response.text();
   const $ = cheerio.load(html);
   const students: any[] = [];
+
+  let seats = 0;
+  $('.faculty-intro__card').each((i, el) => {
+    const caption = $(el).find('.faculty-intro__card-caption').text().trim();
+    if (/мест/i.test(caption)) {
+      const val = parseInt($(el).find('.faculty-intro__card-text').text().trim().replace(/\D/g, ''), 10);
+      if (!isNaN(val)) seats = val;
+    }
+  });
 
   const updMatch = $('.main-screen__text').text().trim().match(/Сведения\s+обновлены:\s*(.+)/i);
   const updatedAt = updMatch ? updMatch[1].trim() : null;
@@ -106,7 +116,7 @@ async function fetchAndParse(type: string, id: string): Promise<CacheEntry> {
     });
   }
 
-  const entry: CacheEntry = { data: students, updatedAt, fetchedAt: Date.now() };
+  const entry: CacheEntry = { data: students, updatedAt, seats, fetchedAt: Date.now() };
   cache.set(`${type}:${id}`, entry);
   return entry;
 }
@@ -131,7 +141,7 @@ async function startServer() {
       if (cached) {
         console.log(`[cache HIT] ${cacheKey}`);
         res.setHeader('X-Cache', 'HIT');
-        res.json({ success: true, data: cached.data, updatedAt: cached.updatedAt });
+        res.json({ success: true, data: cached.data, updatedAt: cached.updatedAt, seats: cached.seats });
         return;
       }
 
@@ -140,7 +150,7 @@ async function startServer() {
         console.log(`[cache WAIT] ${cacheKey}`);
         const entry = await inFlight.get(cacheKey)!;
         res.setHeader('X-Cache', 'WAIT');
-        res.json({ success: true, data: entry.data, updatedAt: entry.updatedAt });
+        res.json({ success: true, data: entry.data, updatedAt: entry.updatedAt, seats: entry.seats });
         return;
       }
 
@@ -151,7 +161,7 @@ async function startServer() {
       inFlight.set(cacheKey, promise);
 
       const entry = await promise;
-      res.json({ success: true, data: entry.data, updatedAt: entry.updatedAt });
+      res.json({ success: true, data: entry.data, updatedAt: entry.updatedAt, seats: entry.seats });
 
     } catch (error: any) {
       console.error('Error fetching competition data:', error.message);

@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { matchSorter } from 'match-sorter';
 import { AnimatePresence } from 'motion/react';
 import { UserIcon, BarChartIcon, GraduationScrollIcon } from 'hugeicons-react';
 
 import { competitions } from './data';
+import { getCompetitionPath, fetchCompetitionDataWithRetry, fetchAllCompetitions } from './lib/api';
 import { BasisType, ViewType, SortConfig, Student, Competition, DirectionRow } from './types';
 import { getAccentTheme } from './constants/theme';
 
@@ -21,12 +22,6 @@ import { SyncOverlay } from './components/SyncOverlay';
 import { Card, CardContent } from './components/ui/card';
 import { Badge } from './components/ui/badge';
 import { cn } from './lib/utils';
-
-function getCompetitionPath(url: string) {
-  const [, path] = url.split('pk.rgsu.net/');
-  const [type, id] = (path || 'competition/').split('/');
-  return { type: type || 'competition', id: id || '' };
-}
 
 function AppContent() {
   const [activeBasis, setActiveBasis] = useState<BasisType>('Бюджет');
@@ -50,14 +45,20 @@ function AppContent() {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [allCompStudents, setAllCompStudents] = useState<Record<string, Student[]>>({});
+  const [seatsByComp, setSeatsByComp] = useState<Record<string, number>>({});
   const [loadingAllDirs, setLoadingAllDirs] = useState(false);
 
   const myPositionModalRef = useRef<HTMLInputElement | null>(null);
 
-  const selectedComp = useMemo(
-    () => competitions.find(c => c.id === selectedCompId) || competitions[0],
-    [selectedCompId]
+  const seatsOf = useCallback(
+    (comp: Competition) => seatsByComp[comp.id] ?? comp.seats,
+    [seatsByComp]
   );
+
+  const selectedComp = useMemo(() => {
+    const base = competitions.find(c => c.id === selectedCompId) || competitions[0];
+    return base ? { ...base, seats: seatsOf(base) } : base;
+  }, [selectedCompId, seatsOf]);
 
   useEffect(() => {
     if (activeView === 'distribution') {
@@ -70,8 +71,8 @@ function AppContent() {
   }, [activeView, selectedComp]);
 
   const filteredCompetitions = useMemo(
-    () => competitions.filter(c => c.basis === activeBasis),
-    [activeBasis]
+    () => competitions.filter(c => c.basis === activeBasis).map(c => ({ ...c, seats: seatsOf(c) })),
+    [activeBasis, seatsOf]
   );
 
   const accent = getAccentTheme(activeBasis);
@@ -102,25 +103,25 @@ function AppContent() {
 
   useEffect(() => {
     async function loadData() {
-      if (selectedComp.basis !== activeBasis) {
+      const comp = competitions.find(c => c.id === selectedCompId) || competitions[0];
+      if (!comp || comp.basis !== activeBasis) {
         setFetchError(null);
         return;
       }
       setIsLoading(true);
       setFetchError(null);
       try {
-        const { type: compType, id: compUrlId } = getCompetitionPath(selectedComp.url);
+        const { type: compType, id: compUrlId } = getCompetitionPath(comp.url);
         if (compUrlId) {
-          const res = await fetch(`/api/competition/${compType}/${compUrlId}`);
-          if (!res.ok) throw new Error('Не удалось загрузить данные');
-          const result = await res.json();
-          if (result.success && result.data && result.data.length > 0) {
-            setFetchedStudents(result.data);
-            setUpdatedAt(result.updatedAt ?? null);
-          } else if (result.success && result.data.length === 0) {
-            throw new Error('Данные не найдены');
+          const data = await fetchCompetitionDataWithRetry(compType, compUrlId);
+          if (data.students.length > 0) {
+            setFetchedStudents(data.students);
+            setUpdatedAt(data.updatedAt ?? null);
+            if (data.seats > 0) {
+              setSeatsByComp((prev) => (prev[comp.id] === data.seats ? prev : { ...prev, [comp.id]: data.seats }));
+            }
           } else {
-            throw new Error(result.error || 'Ошибка загрузки');
+            throw new Error('Данные не найдены');
           }
         }
       } catch (err: any) {
@@ -133,7 +134,7 @@ function AppContent() {
       }
     }
     loadData();
-  }, [selectedComp, activeBasis]);
+  }, [selectedCompId, activeBasis]);
 
   useEffect(() => {
     if (!isMyPositionOpen) return;
@@ -158,29 +159,23 @@ function AppContent() {
     if (pending.length === 0) return;
     let cancelled = false;
     setLoadingAllDirs(true);
-    Promise.allSettled(
-      pending.map(async (comp) => {
-        const { type: compType, id: compUrlId } = getCompetitionPath(comp.url);
-        const res = await fetch(`/api/competition/${compType}/${compUrlId}`);
-        if (!res.ok) throw new Error('Failed to load');
-        const result = await res.json();
-        if (!result.success || !Array.isArray(result.data)) throw new Error('Bad data');
-        return { compId: comp.id, students: result.data as Student[], updatedAt: result.updatedAt ?? null };
-      })
-    ).then((results) => {
+    fetchAllCompetitions(pending, {
+      concurrency: 2,
+      delayMs: 350,
+    }).then((map) => {
       if (cancelled) return;
-      setAllCompStudents((prev) => {
-        const map = { ...prev };
-        results.forEach((r) => { if (r.status === 'fulfilled') map[r.value.compId] = r.value.students; });
-        return map;
+      const studentsMap: Record<string, Student[]> = {};
+      const seatsMap: Record<string, number> = {};
+      const updates: string[] = [];
+      Object.entries(map).forEach(([compId, data]) => {
+        studentsMap[compId] = data.students;
+        if (data.updatedAt) updates.push(data.updatedAt);
+        if (data.seats > 0) seatsMap[compId] = data.seats;
       });
-      const latestUpdate = results
-        .filter((r): r is PromiseFulfilledResult<{ compId: string; students: Student[]; updatedAt: string | null }> => r.status === 'fulfilled')
-        .map(r => r.value.updatedAt)
-        .filter(Boolean)
-        .sort()
-        .pop();
-      if (latestUpdate) setUpdatedAt(latestUpdate);
+      setAllCompStudents((prev) => ({ ...prev, ...studentsMap }));
+      setSeatsByComp((prev) => ({ ...prev, ...seatsMap }));
+      const latest = updates.sort().pop();
+      if (latest) setUpdatedAt(latest);
       setLoadingAllDirs(false);
     });
     return () => { cancelled = true; };
@@ -330,6 +325,17 @@ function AppContent() {
         return { comp, state: 'absent' };
       }
 
+      const seats = seatsByComp[comp.id] ?? comp.seats;
+      const withOriginals = sorted.filter(s => s.hasOriginal);
+      let passingScore: number | null = null;
+      if (withOriginals.length >= seats && seats > 0) {
+        passingScore = withOriginals[seats - 1].totalPoints;
+      } else if (sorted.length >= seats && seats > 0) {
+        passingScore = sorted[seats - 1].totalPoints;
+      } else if (sorted.length > 0) {
+        passingScore = sorted[sorted.length - 1].totalPoints;
+      }
+
       const st = sorted[idx];
       return {
         comp,
@@ -339,6 +345,8 @@ function AppContent() {
         points: st.totalPoints,
         hasOriginal: st.hasOriginal,
         isCurrent: comp.id === selectedComp.id,
+        priority: st.priority,
+        passingScore,
       };
     });
   }, [searchIsCode, searchQuery, competitions, selectedComp, fetchedStudents, allCompStudents]);
@@ -364,7 +372,7 @@ function AppContent() {
   ], []);
 
   const distributionData = useMemo(() => {
-    const basisComps = competitions.filter(c => c.basis === distributionBasis);
+    const basisComps = competitions.filter(c => c.basis === distributionBasis).map(c => ({ ...c, seats: seatsOf(c) }));
     return basisComps.map((comp) => {
       const list = comp.id === selectedComp.id ? fetchedStudents : allCompStudents[comp.id];
 
@@ -411,7 +419,7 @@ function AppContent() {
         passingScore,
       };
     });
-  }, [distributionBasis, distributionConsentOnly, competitions, selectedComp, fetchedStudents, allCompStudents, buckets]);
+  }, [distributionBasis, distributionConsentOnly, competitions, selectedComp, fetchedStudents, allCompStudents, buckets, seatsOf]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased">
