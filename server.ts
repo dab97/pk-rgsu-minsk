@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import os from "os";
 import { createServer as createViteServer } from "vite";
 import * as cheerio from "cheerio";
 
@@ -179,7 +180,12 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    const lan = Object.values(os.networkInterfaces())
+      .flat()
+      .filter((n) => n && n.family === 'IPv4' && !n.internal)
+      .map((n) => `  LAN: http://${n.address}:${PORT}`)
+      .join('\n');
+    console.log(`Server running on:\n  Local: http://localhost:${PORT}\n${lan}`);
   });
 }
 
