@@ -83,6 +83,12 @@ export function DistributionView({
                 Платное
               </button>
             </div>
+            <button
+              onClick={() => window.print()}
+              className="print:hidden inline-flex items-center gap-1.5 px-3 h-10 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors whitespace-nowrap"
+            >
+              Печать PDF
+            </button>
           </div>
         </div>
         {loading && loadedCount === 0 ? (
@@ -91,7 +97,7 @@ export function DistributionView({
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
+            <div id="distribution-print-area" className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
               <table className="w-full text-sm whitespace-nowrap">
                 <thead className="bg-slate-50 dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400">
                   <tr>
@@ -112,6 +118,11 @@ export function DistributionView({
                           <div className="flex items-center gap-2 mt-0.5">
                             <span className="text-xs text-slate-500 dark:text-slate-400">{row.comp.studyForm}</span>
                             <Badge className={cn("text-[10px] px-1.5 py-0 tabular-nums", basis === 'Бюджет' ? "bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border-teal-100 dark:border-teal-900" : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-100 dark:border-amber-900")}>{row.comp.seats} мест</Badge>
+                            {row.loaded && row.passingScore != null && (
+                              <Badge className={cn("text-[10px] px-1.5 py-0 tabular-nums", basis === 'Бюджет' ? "bg-teal-600 text-white dark:bg-teal-600 dark:text-white" : "bg-amber-500 text-white dark:bg-amber-500 dark:text-white")}>
+                                Проходной: {row.passingScore}
+                              </Badge>
+                            )}
                           </div>
                         </td>
                         {row.loaded ? (
@@ -121,6 +132,7 @@ export function DistributionView({
                                 key={i}
                                 className={cn(
                                   "px-2 py-2 text-center tabular-nums",
+                                  i === row.passingIdx && "distribution-passing-cell",
                                   i !== row.passingIdx && "text-slate-600 dark:text-slate-300"
                                 )}
                               >

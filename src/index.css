@@ -50,3 +50,76 @@
     transform: scaleY(1);
   }
 }
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  body {
+    background: #fff !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #distribution-print-area,
+  #distribution-print-area * {
+    visibility: visible;
+  }
+
+  #distribution-print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    max-width: none;
+    overflow: visible !important;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    background: #fff !important;
+  }
+
+  #distribution-print-area table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #94a3b8;
+  }
+
+  #distribution-print-area th {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #distribution-print-area th,
+  #distribution-print-area td {
+    color: #0f172a !important;
+    background: #fff !important;
+    border: 1px solid #cbd5e1;
+    padding: 6px 8px;
+  }
+
+  #distribution-print-area td.distribution-passing-cell,
+  #distribution-print-area td.distribution-passing-cell span {
+    background: #0f766e !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #distribution-print-area tr {
+    background: #fff !important;
+  }
+
+  #distribution-print-area .rounded-full {
+    border-radius: 0 !important;
+  }
+
+  #distribution-print-area td:first-child {
+    background: #fff !important;
+  }
+}

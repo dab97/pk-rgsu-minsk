@@ -337,15 +337,23 @@ function AppContent() {
   }, [searchIsCode, searchQuery, competitions, selectedComp, fetchedStudents, allCompStudents]);
 
   const buckets = useMemo(() => [
-    { label: '300–280', low: 280, high: 300 },
-    { label: '279–260', low: 260, high: 279 },
-    { label: '259–240', low: 240, high: 259 },
-    { label: '239–220', low: 220, high: 239 },
-    { label: '219–200', low: 200, high: 219 },
-    { label: '199–180', low: 180, high: 199 },
-    { label: '179–160', low: 160, high: 179 },
-    { label: '159–140', low: 140, high: 159 },
-    { label: '<140', low: 0, high: 139 },
+    { label: '300–291', low: 291, high: 300 },
+    { label: '290–281', low: 281, high: 290 },
+    { label: '280–271', low: 271, high: 280 },
+    { label: '270–261', low: 261, high: 270 },
+    { label: '260–251', low: 251, high: 260 },
+    { label: '250–241', low: 241, high: 250 },
+    { label: '240–231', low: 231, high: 240 },
+    { label: '230–221', low: 221, high: 230 },
+    { label: '220–211', low: 211, high: 220 },
+    { label: '210–201', low: 201, high: 210 },
+    { label: '200–191', low: 191, high: 200 },
+    { label: '190–181', low: 181, high: 190 },
+    { label: '180–171', low: 171, high: 180 },
+    { label: '170–161', low: 161, high: 170 },
+    { label: '160–151', low: 151, high: 160 },
+    { label: '150–141', low: 141, high: 150 },
+    { label: '<140', low: 0, high: 140 },
   ], []);
 
   const distributionData = useMemo(() => {
