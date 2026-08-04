@@ -111,6 +111,14 @@
     print-color-adjust: exact;
   }
 
+  #distribution-print-area td.distribution-passing-cell-amber,
+  #distribution-print-area td.distribution-passing-cell-amber span {
+    background: #b45309 !important;
+    color: #ffffff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   #distribution-print-area tr {
     background: #fff !important;
   }

@@ -15,6 +15,7 @@ interface DistributionViewProps {
   onBasisChange: (basis: BasisType) => void;
   consentOnly: boolean;
   onConsentChange: (checked: boolean) => void;
+  updatedAt?: string | null;
 }
 
 export function DistributionView({
@@ -25,6 +26,7 @@ export function DistributionView({
   onBasisChange,
   consentOnly,
   onConsentChange,
+  updatedAt,
 }: DistributionViewProps) {
   const loadedCount = rows.filter(r => r.loaded).length;
   return (
@@ -32,8 +34,17 @@ export function DistributionView({
       <div className="flex flex-col gap-3">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Распределение конкурсных баллов</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Сколько абитуриентов в каждом диапазоне баллов по направлениям подготовки</p>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              {basis === 'Бюджет' ? 'Распределение конкурсных баллов' : 'Распределение поданных заявлений'}
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {basis === 'Бюджет'
+                ? 'Сколько абитуриентов в каждом диапазоне баллов по направлениям подготовки'
+                : 'Сколько поданных заявлений в каждом диапазоне баллов по направлениям подготовки'}
+              <span className="text-slate-400 dark:text-slate-500 text-xs ml-1">
+                {updatedAt ? `Сведения обновлены: ${updatedAt}` : '(данные актуальны на момент запроса)'}
+              </span>
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <div className={cn(
@@ -98,6 +109,17 @@ export function DistributionView({
         ) : (
           <>
             <div id="distribution-print-area" className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
+              <div className="hidden print:block pb-3">
+                <h1 className="text-lg font-semibold text-slate-900">
+                  {basis === 'Бюджет'
+                    ? 'Распределение конкурсных баллов по направлениям подготовки'
+                    : 'Распределение поданных заявлений по направлениям подготовки'}
+                </h1>
+                <p className="text-xs text-slate-600 mt-1">
+                  Основа: {basis} · Направлений: {rows.length} · {new Date().toLocaleDateString('ru-RU')}
+                  {updatedAt && <span className="ml-2">· Сведения обновлены: {updatedAt}</span>}
+                </p>
+              </div>
               <table className="w-full text-sm whitespace-nowrap">
                 <thead className="bg-slate-50 dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400">
                   <tr>
@@ -132,7 +154,7 @@ export function DistributionView({
                                 key={i}
                                 className={cn(
                                   "px-2 py-2 text-center tabular-nums",
-                                  i === row.passingIdx && "distribution-passing-cell",
+                                  i === row.passingIdx && cn("distribution-passing-cell", basis === 'Платное' && "distribution-passing-cell-amber"),
                                   i !== row.passingIdx && "text-slate-600 dark:text-slate-300"
                                 )}
                               >

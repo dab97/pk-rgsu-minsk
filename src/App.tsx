@@ -165,7 +165,7 @@ function AppContent() {
         if (!res.ok) throw new Error('Failed to load');
         const result = await res.json();
         if (!result.success || !Array.isArray(result.data)) throw new Error('Bad data');
-        return { compId: comp.id, students: result.data as Student[] };
+        return { compId: comp.id, students: result.data as Student[], updatedAt: result.updatedAt ?? null };
       })
     ).then((results) => {
       if (cancelled) return;
@@ -174,6 +174,13 @@ function AppContent() {
         results.forEach((r) => { if (r.status === 'fulfilled') map[r.value.compId] = r.value.students; });
         return map;
       });
+      const latestUpdate = results
+        .filter((r): r is PromiseFulfilledResult<{ compId: string; students: Student[]; updatedAt: string | null }> => r.status === 'fulfilled')
+        .map(r => r.value.updatedAt)
+        .filter(Boolean)
+        .sort()
+        .pop();
+      if (latestUpdate) setUpdatedAt(latestUpdate);
       setLoadingAllDirs(false);
     });
     return () => { cancelled = true; };
@@ -447,6 +454,7 @@ function AppContent() {
                 onBasisChange={setDistributionBasis}
                 consentOnly={distributionConsentOnly}
                 onConsentChange={setDistributionConsentOnly}
+                updatedAt={updatedAt}
               />
             ) : activeView === 'my-position' ? (
               <MyPositionView
