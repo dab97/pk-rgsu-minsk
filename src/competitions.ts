@@ -19,7 +19,7 @@ export const competitions: Competition[] = [
     studyForm: 'Очная',
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
-    seats: 8,
+    seats: 9,
     url: 'https://pk.rgsu.net/competition/832a62dc-f07a-11f0-b35d-f4034344acdb',
   },
   {
@@ -30,7 +30,7 @@ export const competitions: Competition[] = [
     studyForm: 'Очно-заочная',
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
-    seats: 4,
+    seats: 5,
     url: 'https://pk.rgsu.net/competition/cf01a63b-f07a-11f0-b35d-f4034344acdb',
   },
   {
@@ -41,7 +41,7 @@ export const competitions: Competition[] = [
     studyForm: 'Очная',
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
-    seats: 16,
+    seats: 19,
     url: 'https://pk.rgsu.net/competition/3ebfdc93-f07b-11f0-b35d-f4034344acdb',
   },
   {
@@ -52,7 +52,7 @@ export const competitions: Competition[] = [
     studyForm: 'Очная',
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
-    seats: 8,
+    seats: 9,
     url: 'https://pk.rgsu.net/competition/b90f9726-f07b-11f0-b35d-f4034344acdb',
   },
   {
@@ -63,7 +63,7 @@ export const competitions: Competition[] = [
     studyForm: 'Заочная',
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
-    seats: 8,
+    seats: 10,
     url: 'https://pk.rgsu.net/competition/0d59f6cc-f07c-11f0-b35d-f4034344acdb',
   },
   {

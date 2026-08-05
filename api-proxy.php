@@ -53,13 +53,19 @@ if ($httpCode !== 200) {
     exit;
 }
 
-// Parse seats
+// Parse seats — find card whose caption contains "Количество мест" or starts with "Места"
 $seats = 0;
-if (preg_match('/faculty-intro__card-caption[^>]*>[^<]*мест/i', $html, $m)) {
-    $pos = $m[0] === '' ? 0 : strpos($html, $m[0]);
-    $block = substr($html, max(0, $pos - 200), 700);
-    if (preg_match('/faculty-intro__card-text[^>]*>\s*(\d+)/i', $block, $vm)) {
-        $seats = (int)$vm[1];
+$seatCardRegex = '/<span class="faculty-intro__card-caption">[^<]*(?:Количество мест|Места)[^<]*<\/span>\s*<p class="faculty-intro__card-text">\s*(\d+)/i';
+if (preg_match($seatCardRegex, $html, $sm)) {
+    $seats = (int)$sm[1];
+} else {
+    // Fallback: look for any caption containing "мест" and extract number from same card
+    if (preg_match('/faculty-intro__card-caption[^>]*>[^<]*мест/i', $html, $m)) {
+        $pos = strpos($html, $m[0]);
+        $block = substr($html, $pos, 500);
+        if (preg_match('/faculty-intro__card-text[^>]*>\s*(\d+)/i', $block, $vm)) {
+            $seats = (int)$vm[1];
+        }
     }
 }
 

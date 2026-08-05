@@ -103,11 +103,18 @@ export function parseRgsuHtml(html: string, type: string): ParseResult {
   const warnings: string[] = [];
 
   let seats = 0;
-  const seatMatch = html.match(/faculty-intro__card-caption[^>]*>[^<]*мест/i);
-  if (seatMatch) {
-    const cardBlock = html.slice(Math.max(0, seatMatch.index - 200), seatMatch.index + 500);
-    const valMatch = cardBlock.match(/faculty-intro__card-text[^>]*>\s*(\d+)/i);
-    if (valMatch) seats = parseInt(valMatch[1], 10) || 0;
+  // Primary: find card whose caption contains "Количество мест" or starts with "Места"
+  const seatCardMatch = html.match(/<span class="faculty-intro__card-caption">[^<]*(?:Количество мест|Места)[^<]*<\/span>\s*<p class="faculty-intro__card-text">\s*(\d+)/i);
+  if (seatCardMatch) {
+    seats = parseInt(seatCardMatch[1], 10) || 0;
+  } else {
+    // Fallback: any caption containing "мест"
+    const seatMatch = html.match(/faculty-intro__card-caption[^>]*>[^<]*мест/i);
+    if (seatMatch && seatMatch.index !== undefined) {
+      const cardBlock = html.slice(seatMatch.index, seatMatch.index + 500);
+      const valMatch = cardBlock.match(/faculty-intro__card-text[^>]*>\s*(\d+)/i);
+      if (valMatch) seats = parseInt(valMatch[1], 10) || 0;
+    }
   }
 
   const updMatch = html.match(/Сведения\s+обновлены:\s*([^<]+)/i);
