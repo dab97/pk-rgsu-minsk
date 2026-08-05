@@ -1,5 +1,3 @@
-import type { CheerioAPI } from 'cheerio';
-
 export type ParsedStudent = {
   id: string;
   uniqueCode: string;
@@ -30,108 +28,119 @@ export type ParseResult = {
 const parseNum = (text: string): number => parseInt(text.trim(), 10) || 0;
 const parseStr = (text: string): string => text.trim();
 
-function parseContestRow($: CheerioAPI, cells: any, index: number): ParsedStudent | null {
+function extractCells(trHtml: string): string[] {
+  const cells: string[] = [];
+  const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+  let match;
+  while ((match = cellRegex.exec(trHtml)) !== null) {
+    const inner = match[1].replace(/<[^>]+>/g, '').trim();
+    cells.push(inner);
+  }
+  return cells;
+}
+
+function parseCompetitionRow(cells: string[], index: number): ParsedStudent | null {
   try {
-    const uniqueCode = parseStr($(cells[1]).text());
+    if (cells.length < 18) return null;
+    const uniqueCode = parseStr(cells[1]);
     if (!uniqueCode || uniqueCode === '-') return null;
 
     return {
       id: `student-${index}`,
       uniqueCode,
-      totalPoints: parseNum($(cells[2]).text()),
-      examPoints: parseNum($(cells[3]).text()),
-      subjects: [parseNum($(cells[4]).text()), parseNum($(cells[5]).text()), parseNum($(cells[6]).text())],
-      achievementPoints: parseNum($(cells[7]).text()),
-      hasOriginal: parseStr($(cells[8]).text()).toLowerCase() === 'да',
-      semesterPayment: parseStr($(cells[9]).text()) || 'Нет',
-      priority: parseNum($(cells[10]).text()),
+      totalPoints: parseNum(cells[2]),
+      examPoints: parseNum(cells[3]),
+      subjects: [parseNum(cells[4]), parseNum(cells[5]), parseNum(cells[6])],
+      achievementPoints: parseNum(cells[7]),
+      hasOriginal: parseStr(cells[8]).toLowerCase() === 'да',
+      priority: parseNum(cells[9]),
+      mainHigherPriority: parseStr(cells[10]) || '-',
+      higherPassingPriority: parseStr(cells[11]) || '-',
+      preemptiveRight1: parseStr(cells[12]) || 'Нет',
+      preemptiveRight2: parseStr(cells[13]) || 'Нет',
+      idAtEquality: parseStr(cells[14]) || 'Нет',
+      withoutExams: parseStr(cells[15]) || 'Нет',
+      basisBVI: parseStr(cells[16]) || '-',
+      status: parseStr(cells[17]) || '',
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseContestRow(cells: string[], index: number): ParsedStudent | null {
+  try {
+    if (cells.length < 17) return null;
+    const uniqueCode = parseStr(cells[1]);
+    if (!uniqueCode || uniqueCode === '-') return null;
+
+    return {
+      id: `student-${index}`,
+      uniqueCode,
+      totalPoints: parseNum(cells[2]),
+      examPoints: parseNum(cells[3]),
+      subjects: [parseNum(cells[4]), parseNum(cells[5]), parseNum(cells[6])],
+      achievementPoints: parseNum(cells[7]),
+      hasOriginal: parseStr(cells[8]).toLowerCase() === 'да',
+      semesterPayment: parseStr(cells[9]) || 'Нет',
+      priority: parseNum(cells[10]),
       mainHigherPriority: '-',
       higherPassingPriority: '-',
-      preemptiveRight1: parseStr($(cells[11]).text()) || 'Нет',
-      preemptiveRight2: parseStr($(cells[12]).text()) || 'Нет',
-      idAtEquality: parseStr($(cells[13]).text()) || 'Нет',
-      withoutExams: parseStr($(cells[14]).text()) || 'Нет',
-      basisBVI: parseStr($(cells[15]).text()) || '-',
-      status: parseStr($(cells[16]).text()) || '',
+      preemptiveRight1: parseStr(cells[11]) || 'Нет',
+      preemptiveRight2: parseStr(cells[12]) || 'Нет',
+      idAtEquality: parseStr(cells[13]) || 'Нет',
+      withoutExams: parseStr(cells[14]) || 'Нет',
+      basisBVI: parseStr(cells[15]) || '-',
+      status: parseStr(cells[16]) || '',
     };
   } catch {
     return null;
   }
 }
 
-function parseCompetitionRow($: CheerioAPI, cells: any, index: number): ParsedStudent | null {
-  try {
-    const uniqueCode = parseStr($(cells[1]).text());
-    if (!uniqueCode || uniqueCode === '-') return null;
-
-    return {
-      id: `student-${index}`,
-      uniqueCode,
-      totalPoints: parseNum($(cells[2]).text()),
-      examPoints: parseNum($(cells[3]).text()),
-      subjects: [parseNum($(cells[4]).text()), parseNum($(cells[5]).text()), parseNum($(cells[6]).text())],
-      achievementPoints: parseNum($(cells[7]).text()),
-      hasOriginal: parseStr($(cells[8]).text()).toLowerCase() === 'да',
-      priority: parseNum($(cells[9]).text()),
-      mainHigherPriority: parseStr($(cells[10]).text()) || '-',
-      higherPassingPriority: parseStr($(cells[11]).text()) || '-',
-      preemptiveRight1: parseStr($(cells[12]).text()) || 'Нет',
-      preemptiveRight2: parseStr($(cells[13]).text()) || 'Нет',
-      idAtEquality: parseStr($(cells[14]).text()) || 'Нет',
-      withoutExams: parseStr($(cells[15]).text()) || 'Нет',
-      basisBVI: parseStr($(cells[16]).text()) || '-',
-      status: parseStr($(cells[17]).text()) || '',
-    };
-  } catch {
-    return null;
-  }
-}
-
-export async function parseRgsuHtml(html: string, type: string): Promise<ParseResult> {
-  const cheerio = await import('cheerio');
-  const $ = cheerio.load(html);
+export function parseRgsuHtml(html: string, type: string): ParseResult {
   const students: ParsedStudent[] = [];
   const warnings: string[] = [];
 
   let seats = 0;
-  $('.faculty-intro__card').each((_, el) => {
-    const caption = $(el).find('.faculty-intro__card-caption').text().trim();
-    if (/мест/i.test(caption)) {
-      const val = parseInt($(el).find('.faculty-intro__card-text').text().trim().replace(/\D/g, ''), 10);
-      if (!isNaN(val)) seats = val;
-    }
-  });
+  const seatMatch = html.match(/faculty-intro__card-caption[^>]*>[^<]*мест/i);
+  if (seatMatch) {
+    const cardBlock = html.slice(Math.max(0, seatMatch.index - 200), seatMatch.index + 500);
+    const valMatch = cardBlock.match(/faculty-intro__card-text[^>]*>\s*(\d+)/i);
+    if (valMatch) seats = parseInt(valMatch[1], 10) || 0;
+  }
 
-  const updMatch = $('.main-screen__text').text().trim().match(/Сведения\s+обновлены:\s*(.+)/i);
+  const updMatch = html.match(/Сведения\s+обновлены:\s*([^<]+)/i);
   const updatedAt = updMatch ? updMatch[1].trim() : null;
 
-  const table = $('table').first();
-  if (table.length) {
-    const rows = table.find('tbody tr');
-    let skippedRows = 0;
+  const rowRegex = /<tr\s+data-unique-code="[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
+  let rowMatch;
+  let rowIndex = 0;
+  let skippedRows = 0;
 
-    rows.each((i, row) => {
-      const cells = $(row).find('td');
-      if (cells.length >= 10) {
-        const parser = type === 'contest' ? parseContestRow : parseCompetitionRow;
-        const student = parser($, cells, i);
-        if (student) {
-          students.push(student);
-        } else {
-          skippedRows++;
-        }
+  while ((rowMatch = rowRegex.exec(html)) !== null) {
+    const trHtml = rowMatch[1];
+    const cells = extractCells(trHtml);
+    if (cells.length >= 10) {
+      const parser = type === 'contest' ? parseContestRow : parseCompetitionRow;
+      const student = parser(cells, rowIndex);
+      if (student) {
+        students.push(student);
       } else {
         skippedRows++;
       }
-    });
-
-    if (skippedRows > 0 && students.length === 0) {
-      warnings.push(`Не удалось распознать ни одной строки. Возможно, изменилась структура HTML.`);
-    } else if (skippedRows > 0) {
-      warnings.push(`Пропущено ${skippedRows} строк из-за ошибок парсинга.`);
+    } else {
+      skippedRows++;
     }
-  } else {
+    rowIndex++;
+  }
+
+  if (students.length === 0 && rowIndex === 0) {
     warnings.push('Таблица с данными не найдена на странице.');
+  } else if (skippedRows > 0 && students.length === 0) {
+    warnings.push('Не удалось распознать ни одной строки. Возможно, изменилась структура HTML.');
+  } else if (skippedRows > 0) {
+    warnings.push(`Пропущено ${skippedRows} строк из-за ошибок парсинга.`);
   }
 
   if (students.length === 0 && seats === 0) {

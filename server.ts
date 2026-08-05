@@ -59,7 +59,7 @@ async function fetchAndParse(type: string, id: string): Promise<CacheEntry> {
   }
 
   const html = await response.text();
-  const result: ParseResult = await parseRgsuHtml(html, type);
+  const result: ParseResult = parseRgsuHtml(html, type);
 
   const entry: CacheEntry = { data: result.students, updatedAt: result.updatedAt, seats: result.seats, warnings: result.warnings, fetchedAt: Date.now() };
   cache.set(`${type}:${id}`, entry);
