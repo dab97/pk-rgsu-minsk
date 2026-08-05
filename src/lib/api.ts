@@ -59,9 +59,9 @@ export async function fetchCompetitionDataWithRetry(type: string, id: string): P
 
 export async function fetchAllCompetitions(
   comps: Competition[],
-  opts: { concurrency?: number; delayMs?: number; onProgress?: (done: number, total: number) => void } = {}
+  opts: { concurrency?: number; delayMs?: number; onProgress?: (done: number, total: number) => void; signal?: AbortSignal } = {}
 ): Promise<CompetitionDataMap> {
-  const { concurrency = 2, delayMs = 350, onProgress } = opts;
+  const { concurrency = 2, delayMs = 350, onProgress, signal } = opts;
   const results: CompetitionDataMap = {};
 
   const queue = [...comps];
@@ -71,6 +71,7 @@ export async function fetchAllCompetitions(
   return new Promise<CompetitionDataMap>((resolve) => {
     async function worker() {
       while (queue.length > 0) {
+        if (signal?.aborted) break;
         const comp = queue.shift()!;
         const { type, id } = getCompetitionPath(comp.url);
         try {
@@ -81,7 +82,7 @@ export async function fetchAllCompetitions(
         }
         done += 1;
         onProgress?.(done, comps.length);
-        if (delayMs > 0) await sleep(delayMs);
+        if (delayMs > 0 && !signal?.aborted) await sleep(delayMs);
       }
       running -= 1;
       if (running === 0) resolve(results);

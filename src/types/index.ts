@@ -26,7 +26,6 @@ export type DirectionRow = {
 
 export type DashboardStats = {
   totalApps: number;
-  originalCount: number;
   originalsCount: number;
   competitionRatio: string;
   predictedPassing: number | null;

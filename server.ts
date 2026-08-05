@@ -2,15 +2,16 @@ import express from "express";
 import path from "path";
 import os from "os";
 import { createServer as createViteServer } from "vite";
-import * as cheerio from "cheerio";
+import { parseRgsuHtml, type ParseResult, type ParsedStudent } from "./shared/parser";
 
 // ─── In-memory cache ───────────────────────────────────────────────────────
-const CACHE_TTL_MS = 3 * 60 * 1000; // 3 минуты
+const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS) || 3 * 60 * 1000; // 3 минуты по умолчанию
 
 interface CacheEntry {
-  data: any[];
+  data: ParsedStudent[];
   updatedAt: string | null;
   seats: number;
+  warnings: string[];
   fetchedAt: number;
 }
 
@@ -18,6 +19,13 @@ const cache = new Map<string, CacheEntry>();
 // Хранит промисы активных запросов — чтобы дублирующие запросы ждали первый,
 // а не параллельно долбили внешний сервер
 const inFlight = new Map<string, Promise<CacheEntry>>();
+
+function evictExpired(): void {
+  const now = Date.now();
+  for (const [key, entry] of cache) {
+    if (now - entry.fetchedAt > CACHE_TTL_MS) cache.delete(key);
+  }
+}
 
 function getCached(key: string): CacheEntry | null {
   const entry = cache.get(key);
@@ -28,10 +36,14 @@ function getCached(key: string): CacheEntry | null {
   }
   return entry;
 }
+
+// Периодическая очистка каждую минуту
+setInterval(evictExpired, 60_000).unref();
 // ──────────────────────────────────────────────────────────────────────────
 
 async function fetchAndParse(type: string, id: string): Promise<CacheEntry> {
   const url = `https://pk.rgsu.net/${type}/${id}`;
+  const fetchTimeout = Number(process.env.FETCH_TIMEOUT_MS) || 10000;
 
   const response = await fetch(url, {
     headers: {
@@ -39,7 +51,7 @@ async function fetchAndParse(type: string, id: string): Promise<CacheEntry> {
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
       'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
     },
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(fetchTimeout),
   });
 
   if (!response.ok) {
@@ -47,84 +59,16 @@ async function fetchAndParse(type: string, id: string): Promise<CacheEntry> {
   }
 
   const html = await response.text();
-  const $ = cheerio.load(html);
-  const students: any[] = [];
+  const result: ParseResult = parseRgsuHtml(html, type);
 
-  let seats = 0;
-  $('.faculty-intro__card').each((i, el) => {
-    const caption = $(el).find('.faculty-intro__card-caption').text().trim();
-    if (/мест/i.test(caption)) {
-      const val = parseInt($(el).find('.faculty-intro__card-text').text().trim().replace(/\D/g, ''), 10);
-      if (!isNaN(val)) seats = val;
-    }
-  });
-
-  const updMatch = $('.main-screen__text').text().trim().match(/Сведения\s+обновлены:\s*(.+)/i);
-  const updatedAt = updMatch ? updMatch[1].trim() : null;
-
-  const table = $('table').first();
-  if (table.length) {
-    const rows = table.find('tbody tr');
-    rows.each((i, row) => {
-      const cells = $(row).find('td');
-      if (cells.length >= 10) {
-        const parseNum = (text: string) => parseInt(text.trim(), 10) || 0;
-        const parseStr = (text: string) => text.trim();
-        const uniqueCode = parseStr($(cells[1]).text());
-        if (uniqueCode && uniqueCode !== '-') {
-          if (type === 'contest') {
-            students.push({
-              id: `student-${i}`,
-              uniqueCode,
-              totalPoints: parseNum($(cells[2]).text()),
-              examPoints: parseNum($(cells[3]).text()),
-              subjects: [parseNum($(cells[4]).text()), parseNum($(cells[5]).text()), parseNum($(cells[6]).text())],
-              achievementPoints: parseNum($(cells[7]).text()),
-              hasOriginal: parseStr($(cells[8]).text()).toLowerCase() === 'да',
-              semesterPayment: parseStr($(cells[9]).text()) || 'Нет',
-              priority: parseNum($(cells[10]).text()),
-              mainHigherPriority: '-',
-              higherPassingPriority: '-',
-              preemptiveRight1: parseStr($(cells[11]).text()) || 'Нет',
-              preemptiveRight2: parseStr($(cells[12]).text()) || 'Нет',
-              idAtEquality: parseStr($(cells[13]).text()) || 'Нет',
-              withoutExams: parseStr($(cells[14]).text()) || 'Нет',
-              basisBVI: parseStr($(cells[15]).text()) || '-',
-              status: parseStr($(cells[16]).text()) || '',
-            });
-          } else {
-            students.push({
-              id: `student-${i}`,
-              uniqueCode,
-              totalPoints: parseNum($(cells[2]).text()),
-              examPoints: parseNum($(cells[3]).text()),
-              subjects: [parseNum($(cells[4]).text()), parseNum($(cells[5]).text()), parseNum($(cells[6]).text())],
-              achievementPoints: parseNum($(cells[7]).text()),
-              hasOriginal: parseStr($(cells[8]).text()).toLowerCase() === 'да',
-              priority: parseNum($(cells[9]).text()),
-              mainHigherPriority: parseStr($(cells[10]).text()) || '-',
-              higherPassingPriority: parseStr($(cells[11]).text()) || '-',
-              preemptiveRight1: parseStr($(cells[12]).text()) || 'Нет',
-              preemptiveRight2: parseStr($(cells[13]).text()) || 'Нет',
-              idAtEquality: parseStr($(cells[14]).text()) || 'Нет',
-              withoutExams: parseStr($(cells[15]).text()) || 'Нет',
-              basisBVI: parseStr($(cells[16]).text()) || '-',
-              status: parseStr($(cells[17]).text()) || '',
-            });
-          }
-        }
-      }
-    });
-  }
-
-  const entry: CacheEntry = { data: students, updatedAt, seats, fetchedAt: Date.now() };
+  const entry: CacheEntry = { data: result.students, updatedAt: result.updatedAt, seats: result.seats, warnings: result.warnings, fetchedAt: Date.now() };
   cache.set(`${type}:${id}`, entry);
   return entry;
 }
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // API route for fetching competition data
   app.get("/api/competition/:type/:id", async (req, res) => {
@@ -142,7 +86,7 @@ async function startServer() {
       if (cached) {
         console.log(`[cache HIT] ${cacheKey}`);
         res.setHeader('X-Cache', 'HIT');
-        res.json({ success: true, data: cached.data, updatedAt: cached.updatedAt, seats: cached.seats });
+        res.json({ success: true, data: cached.data, updatedAt: cached.updatedAt, seats: cached.seats, warnings: cached.warnings });
         return;
       }
 
@@ -151,7 +95,7 @@ async function startServer() {
         console.log(`[cache WAIT] ${cacheKey}`);
         const entry = await inFlight.get(cacheKey)!;
         res.setHeader('X-Cache', 'WAIT');
-        res.json({ success: true, data: entry.data, updatedAt: entry.updatedAt, seats: entry.seats });
+        res.json({ success: true, data: entry.data, updatedAt: entry.updatedAt, seats: entry.seats, warnings: entry.warnings });
         return;
       }
 
@@ -162,7 +106,7 @@ async function startServer() {
       inFlight.set(cacheKey, promise);
 
       const entry = await promise;
-      res.json({ success: true, data: entry.data, updatedAt: entry.updatedAt, seats: entry.seats });
+      res.json({ success: true, data: entry.data, updatedAt: entry.updatedAt, seats: entry.seats, warnings: entry.warnings });
 
     } catch (error: any) {
       console.error('Error fetching competition data:', error.message);

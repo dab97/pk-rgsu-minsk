@@ -1,16 +1,6 @@
 import { competitions } from './competitions';
 
-export type Competition = {
-  id: string;
-  title: string;
-  subtitle: string;
-  branch: string;
-  studyForm: string;
-  educationLevel: string;
-  basis: string;
-  seats: number;
-  url: string;
-};
+export type { Competition } from './competitions';
 
 export type Student = {
   id: string; // Internal unique ID
@@ -33,4 +23,3 @@ export type Student = {
 };
 
 export { competitions };
-export type { CompetitionSource } from './competitions';

@@ -1,4 +1,4 @@
-export type CompetitionSource = {
+export type Competition = {
   id: string;
   title: string;
   subtitle: string;
@@ -10,7 +10,7 @@ export type CompetitionSource = {
   url: string;
 };
 
-export const competitions: CompetitionSource[] = [
+export const competitions: Competition[] = [
   {
     id: 'psychology-fulltime',
     title: '37.03.01 — Психология',

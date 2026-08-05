@@ -1,9 +1,28 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import * as cheerio from 'cheerio';
+import { parseRgsuHtml, type ParseResult } from '../../../shared/parser';
 
-const FETCH_TIMEOUT_MS = 50000;
-const RETRY_ATTEMPTS = 2;
-const RETRY_DELAY_MS = 1000;
+const FETCH_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS) || 50000;
+const RETRY_ATTEMPTS = Number(process.env.RETRY_ATTEMPTS) || 2;
+const RETRY_DELAY_MS = Number(process.env.RETRY_DELAY_MS) || 1000;
+const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS) || 3 * 60 * 1000;
+
+interface CacheEntry {
+  data: ParseResult;
+  fetchedAt: number;
+}
+
+const cache = new Map<string, CacheEntry>();
+const inFlight = new Map<string, Promise<CacheEntry>>();
+
+function getCached(key: string): ParseResult | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.fetchedAt > CACHE_TTL_MS) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
 
 async function fetchHtml(url: string): Promise<string> {
   let lastError: any;
@@ -35,6 +54,15 @@ async function fetchHtml(url: string): Promise<string> {
   throw lastError;
 }
 
+async function fetchAndParse(type: string, id: string): Promise<CacheEntry> {
+  const url = `https://pk.rgsu.net/${type}/${id}`;
+  const html = await fetchHtml(url);
+  const result = parseRgsuHtml(html, type);
+  const entry: CacheEntry = { data: result, fetchedAt: Date.now() };
+  cache.set(`${type}:${id}`, entry);
+  return entry;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { type, id } = req.query;
 
@@ -46,94 +74,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ success: false, error: 'Invalid competition type' });
   }
 
-  const url = `https://pk.rgsu.net/${type}/${id}`;
+  const cacheKey = `${type}:${id}`;
 
-  try {
-    const html = await fetchHtml(url);
-    const $ = cheerio.load(html);
-
-    const students: any[] = [];
-
-    let seats = 0;
-    $('.faculty-intro__card').each((i, el) => {
-      const caption = $(el).find('.faculty-intro__card-caption').text().trim();
-      if (/мест/i.test(caption)) {
-        const val = parseInt($(el).find('.faculty-intro__card-text').text().trim().replace(/\D/g, ''), 10);
-        if (!isNaN(val)) seats = val;
-      }
-    });
-
-    const updMatch = $('.main-screen__text').text().trim().match(/Сведения\s+обновлены:\s*(.+)/i);
-    const updatedAt = updMatch ? updMatch[1].trim() : null;
-
-    const table = $('table').first();
-
-    if (table.length) {
-      const rows = table.find('tbody tr');
-      rows.each((i, row) => {
-        const cells = $(row).find('td');
-        if (cells.length >= 10) {
-          const parseNum = (text: string) => parseInt(text.trim(), 10) || 0;
-          const parseStr = (text: string) => text.trim();
-
-          const uniqueCode = parseStr($(cells[1]).text());
-
-          if (uniqueCode && uniqueCode !== '-') {
-            if (type === 'contest') {
-              students.push({
-                id: `student-${i}`,
-                uniqueCode,
-                totalPoints: parseNum($(cells[2]).text()),
-                examPoints: parseNum($(cells[3]).text()),
-                subjects: [
-                  parseNum($(cells[4]).text()),
-                  parseNum($(cells[5]).text()),
-                  parseNum($(cells[6]).text()),
-                ],
-                achievementPoints: parseNum($(cells[7]).text()),
-                hasOriginal: parseStr($(cells[8]).text()).toLowerCase() === 'да',
-                semesterPayment: parseStr($(cells[9]).text()) || 'Нет',
-                priority: parseNum($(cells[10]).text()),
-                mainHigherPriority: '-',
-                higherPassingPriority: '-',
-                preemptiveRight1: parseStr($(cells[11]).text()) || 'Нет',
-                preemptiveRight2: parseStr($(cells[12]).text()) || 'Нет',
-                idAtEquality: parseStr($(cells[13]).text()) || 'Нет',
-                withoutExams: parseStr($(cells[14]).text()) || 'Нет',
-                basisBVI: parseStr($(cells[15]).text()) || '-',
-                status: parseStr($(cells[16]).text()) || '',
-              });
-            } else {
-              students.push({
-                id: `student-${i}`,
-                uniqueCode,
-                totalPoints: parseNum($(cells[2]).text()),
-                examPoints: parseNum($(cells[3]).text()),
-                subjects: [
-                  parseNum($(cells[4]).text()),
-                  parseNum($(cells[5]).text()),
-                  parseNum($(cells[6]).text()),
-                ],
-                achievementPoints: parseNum($(cells[7]).text()),
-                hasOriginal: parseStr($(cells[8]).text()).toLowerCase() === 'да',
-                priority: parseNum($(cells[9]).text()),
-                mainHigherPriority: parseStr($(cells[10]).text()) || '-',
-                higherPassingPriority: parseStr($(cells[11]).text()) || '-',
-                preemptiveRight1: parseStr($(cells[12]).text()) || 'Нет',
-                preemptiveRight2: parseStr($(cells[13]).text()) || 'Нет',
-                idAtEquality: parseStr($(cells[14]).text()) || 'Нет',
-                withoutExams: parseStr($(cells[15]).text()) || 'Нет',
-                basisBVI: parseStr($(cells[16]).text()) || '-',
-                status: parseStr($(cells[17]).text()) || '',
-              });
-            }
-          }
-        }
-      });
-    }
-
+  // 1. Отдаём из кэша если свежий
+  const cached = getCached(cacheKey);
+  if (cached) {
+    res.setHeader('X-Cache', 'HIT');
     res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=60');
-    return res.json({ success: true, data: students, updatedAt, seats });
+    return res.json({ success: true, data: cached.students, updatedAt: cached.updatedAt, seats: cached.seats, warnings: cached.warnings });
+  }
+
+  // 2. Если уже идёт запрос для этого ключа — ждём его результата
+  if (inFlight.has(cacheKey)) {
+    const entry = await inFlight.get(cacheKey)!;
+    res.setHeader('X-Cache', 'WAIT');
+    res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=60');
+    return res.json({ success: true, data: entry.data.students, updatedAt: entry.data.updatedAt, seats: entry.data.seats, warnings: entry.data.warnings });
+  }
+
+  // 3. Запускаем новый запрос
+  try {
+    const promise = fetchAndParse(type, id).finally(() => inFlight.delete(cacheKey));
+    inFlight.set(cacheKey, promise);
+
+    const entry = await promise;
+    res.setHeader('X-Cache', 'MISS');
+    res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=60');
+    return res.json({ success: true, data: entry.data.students, updatedAt: entry.data.updatedAt, seats: entry.data.seats, warnings: entry.data.warnings });
   } catch (error: any) {
     console.error('Error fetching competition data:', error.message);
     return res.status(500).json({

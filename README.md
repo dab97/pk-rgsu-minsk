@@ -33,6 +33,8 @@
 | `npm start`       | Запуск собранного prod-сервера (`node dist/server.cjs`)               |
 | `npm run preview` | Предпросмотр Vite-сборки                                              |
 | `npm run lint`    | Проверка типов (`tsc --noEmit`)                                       |
+| `npm test`        | Запуск тестов (Vitest)                                                |
+| `npm run test:watch` | Запуск тестов в watch-режиме                                       |
 | `npm run clean`   | Удаление `dist/`                                                      |
 
 ## Запуск локально
@@ -50,6 +52,20 @@ npm start
 
 Сервер доступен на `http://localhost:3000` (и по LAN-адресу).
 
+## Тесты
+
+```bash
+npm test              # Один запуск
+npm run test:watch    # Watch-режим (перезапуск при изменении файлов, выход — Ctrl+C)
+```
+
+| Файл                            | Тестов | Что покрывает                                    |
+| ------------------------------- | ------ | ------------------------------------------------ |
+| `shared/parser.test.ts`         | 13     | Парсинг HTML,座位,updatedAt,edge cases           |
+| `src/hooks/useStudents.test.ts` | 8      | Сортировка, фильтрация, rankedStudents           |
+| `src/hooks/useStats.test.ts`    | 8      | Статистика, прогноз проходного, средний балл     |
+| `src/hooks/useMyPosition.test.ts`| 10     | Позиция студента, поиск по направлениям          |
+
 ## Структура проекта
 
 ```
@@ -58,12 +74,22 @@ pk-rgsu-minsk/
 │   └── competition/
 │       └── [type]/
 │           └── [id].ts        # Serverless-функция для Vercel
+├── shared/
+│   ├── parser.ts              # Общий парсер HTML pk.rgsu.net
+│   └── parser.test.ts         # Тесты парсера
 ├── src/
 │   ├── App.tsx                # Корневой компонент, роутинг состояний
 │   ├── main.tsx               # Точка входа React
 │   ├── index.css              # Глобальные стили
 │   ├── competitions.ts        # Список направлений и их ID
-│   ├── data.ts                # Демо-данные для offline-режима
+│   ├── data.ts                # Типы Student, Competition
+│   ├── hooks/
+│   │   ├── useCompetitionData.ts  # Загрузка данных конкурса
+│   │   ├── useAllCompetitions.ts  # Загрузка всех направлений
+│   │   ├── useStudents.ts         # Сортировка и фильтрация
+│   │   ├── useStats.ts            # Статистика и прогноз
+│   │   ├── useMyPosition.ts       # Позиция студента
+│   │   └── *.test.ts              # Тесты хуков
 │   ├── components/
 │   │   ├── CompetitionHeroBanner.tsx  # Шапка направления (баллы, места)
 │   │   ├── CompetitionTable.tsx       # Таблица конкурсного списка
@@ -85,6 +111,7 @@ pk-rgsu-minsk/
 │   └── lib/
 │       └── utils.ts           # cn() — утилита объединения классов
 ├── server.ts                  # Express-сервер (dev + prod), парсер pk.rgsu.net
+├── vitest.config.ts           # Конфигурация Vitest
 ├── vite.config.ts
 ├── vercel.json                # Конфигурация Vercel (maxDuration: 60s)
 └── package.json
