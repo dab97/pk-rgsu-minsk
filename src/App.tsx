@@ -200,7 +200,9 @@ function AppContent() {
     let result = [...students];
 
     if (consentOnly) {
-      result = result.filter(s => s.hasOriginal);
+      result = activeBasis === 'Бюджет'
+        ? result.filter(s => s.higherPassingPriority !== '-' && s.higherPassingPriority !== 'Нет')
+        : result.filter(s => s.hasOriginal);
     }
 
     if (searchQuery.trim()) {
@@ -262,9 +264,13 @@ function AppContent() {
 
     let predictedPassing: number | null = null;
 
-    const admittedWithOriginals = rankedStudents.filter(s => s.hasOriginal);
-    if (admittedWithOriginals.length >= seats && seats > 0) {
-      predictedPassing = admittedWithOriginals[seats - 1].totalPoints;
+    // Для бюджета используем ВПП (Высший проходной приоритет), для платного — согласие/договор
+    const admitted = activeBasis === 'Бюджет'
+      ? rankedStudents.filter(s => s.higherPassingPriority !== '-' && s.higherPassingPriority !== 'Нет')
+      : rankedStudents.filter(s => s.hasOriginal);
+
+    if (admitted.length >= seats && seats > 0) {
+      predictedPassing = admitted[seats - 1].totalPoints;
     } else if (rankedStudents.length >= seats && seats > 0) {
       predictedPassing = rankedStudents[seats - 1].totalPoints;
     } else if (rankedStudents.length > 0) {
@@ -326,10 +332,13 @@ function AppContent() {
       }
 
       const seats = seatsByComp[comp.id] ?? comp.seats;
-      const withOriginals = sorted.filter(s => s.hasOriginal);
+      // Для бюджета: ВПП, для платного: согласие
+      const admitted = comp.basis === 'Бюджет'
+        ? sorted.filter(s => s.higherPassingPriority !== '-' && s.higherPassingPriority !== 'Нет')
+        : sorted.filter(s => s.hasOriginal);
       let passingScore: number | null = null;
-      if (withOriginals.length >= seats && seats > 0) {
-        passingScore = withOriginals[seats - 1].totalPoints;
+      if (admitted.length >= seats && seats > 0) {
+        passingScore = admitted[seats - 1].totalPoints;
       } else if (sorted.length >= seats && seats > 0) {
         passingScore = sorted[seats - 1].totalPoints;
       } else if (sorted.length > 0) {
@@ -387,7 +396,11 @@ function AppContent() {
         };
       }
 
-      const filtered = distributionConsentOnly ? list.filter(s => s.hasOriginal) : list;
+      const filtered = distributionConsentOnly
+        ? distributionBasis === 'Бюджет'
+          ? list.filter(s => s.higherPassingPriority !== '-' && s.higherPassingPriority !== 'Нет')
+          : list.filter(s => s.hasOriginal)
+        : list;
       const sorted = [...filtered].sort((a, b) => {
         if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
         if (a.examPoints !== b.examPoints) return b.examPoints - a.examPoints;

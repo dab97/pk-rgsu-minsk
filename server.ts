@@ -81,6 +81,7 @@ async function fetchAndParse(type: string, id: string): Promise<CacheEntry> {
               subjects: [parseNum($(cells[4]).text()), parseNum($(cells[5]).text()), parseNum($(cells[6]).text())],
               achievementPoints: parseNum($(cells[7]).text()),
               hasOriginal: parseStr($(cells[8]).text()).toLowerCase() === 'да',
+              semesterPayment: parseStr($(cells[9]).text()) || 'Нет',
               priority: parseNum($(cells[10]).text()),
               mainHigherPriority: '-',
               higherPassingPriority: '-',

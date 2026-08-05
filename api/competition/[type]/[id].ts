@@ -92,6 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 ],
                 achievementPoints: parseNum($(cells[7]).text()),
                 hasOriginal: parseStr($(cells[8]).text()).toLowerCase() === 'да',
+                semesterPayment: parseStr($(cells[9]).text()) || 'Нет',
                 priority: parseNum($(cells[10]).text()),
                 mainHigherPriority: '-',
                 higherPassingPriority: '-',

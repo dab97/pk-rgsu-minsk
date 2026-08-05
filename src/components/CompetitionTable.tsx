@@ -113,7 +113,7 @@ export function CompetitionTable({
                 className={accent.checkbox}
               />
               <Label htmlFor="consent-only" className={cn("cursor-pointer text-sm font-medium", accent.text)}>
-                С {activeBasis === 'Бюджет' ? 'согласием' : 'договором'}
+                {activeBasis === 'Бюджет' ? 'Высший проходной приоритет' : 'С договором'}
               </Label>
             </div>
             <div className="md:hidden flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1 h-10 w-full sm:w-auto">
@@ -195,6 +195,11 @@ export function CompetitionTable({
                 <TableHead className="text-center leading-tight">
                   {activeBasis === 'Бюджет' ? 'Согласие на зачисление' : 'Наличие заключенного договора'}
                 </TableHead>
+                {activeBasis === 'Платное' && (
+                  <TableHead className="text-center leading-tight text-slate-500">
+                    Оплата за семестр
+                  </TableHead>
+                )}
                 <TableHead
                   className="cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 leading-tight"
                   onClick={() => handleSort('priority')}
@@ -208,8 +213,12 @@ export function CompetitionTable({
                     )}
                   </div>
                 </TableHead>
-                <TableHead className="text-center leading-tight text-slate-500">Основной высший приоритет</TableHead>
-                <TableHead className="text-center leading-tight text-slate-500">Высший проходной приоритет</TableHead>
+                {activeBasis === 'Бюджет' && (
+                  <>
+                    <TableHead className="text-center leading-tight text-slate-500">Основной высший приоритет</TableHead>
+                    <TableHead className="text-center leading-tight text-slate-500">Высший проходной приоритет</TableHead>
+                  </>
+                )}
                 <TableHead className="text-center leading-tight text-slate-500">Преимущественное право 1</TableHead>
                 <TableHead className="text-center leading-tight text-slate-500">Преимущественное право 2</TableHead>
                 <TableHead className="text-center leading-tight text-slate-500">ИД при равенстве по иным критериям</TableHead>
@@ -258,11 +267,20 @@ export function CompetitionTable({
                       <TableCell className="whitespace-nowrap text-center">
                         {student.hasOriginal ? 'Да' : 'Нет'}
                       </TableCell>
+                      {activeBasis === 'Платное' && (
+                        <TableCell className="whitespace-nowrap text-center">
+                          {student.semesterPayment || 'Нет'}
+                        </TableCell>
+                      )}
                       <TableCell className={cn("whitespace-nowrap tabular-nums text-center", accent.text)}>
                         {student.priority}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-left">{student.mainHigherPriority}</TableCell>
-                      <TableCell className="whitespace-nowrap text-left">{student.higherPassingPriority}</TableCell>
+                      {activeBasis === 'Бюджет' && (
+                        <>
+                          <TableCell className="whitespace-nowrap text-left">{student.mainHigherPriority}</TableCell>
+                          <TableCell className="whitespace-nowrap text-left">{student.higherPassingPriority}</TableCell>
+                        </>
+                      )}
                       <TableCell className="whitespace-nowrap text-left">{student.preemptiveRight1}</TableCell>
                       <TableCell className="whitespace-nowrap text-left">{student.preemptiveRight2}</TableCell>
                       <TableCell className="whitespace-nowrap text-left">{student.idAtEquality}</TableCell>

@@ -72,7 +72,7 @@ export function DistributionView({
                 "cursor-pointer text-sm font-medium whitespace-nowrap",
                 basis === 'Бюджет' ? "text-teal-600 dark:text-teal-400" : "text-amber-600 dark:text-amber-400"
               )}>
-                С {basis === 'Бюджет' ? 'согласием' : 'договором'}
+                С {basis === 'Бюджет' ? 'ВПП' : 'договором'}
               </Label>
             </div>
             <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1 h-10 items-center flex-1 lg:flex-initial lg:w-fit">
