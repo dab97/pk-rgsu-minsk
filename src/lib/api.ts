@@ -14,8 +14,13 @@ export function getCompetitionPath(url: string) {
   return { type: type || 'competition', id: id || '' };
 }
 
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
+
 async function fetchCompetitionData(type: string, id: string): Promise<CompetitionFetchResult> {
-  const res = await fetch(`/api/competition/${type}/${id}`);
+  const url = API_BASE
+    ? `${API_BASE}?type=${type}&id=${id}`
+    : `/api/competition/${type}/${id}`;
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const result = await res.json();
   if (!result.success || !Array.isArray(result.data)) {
