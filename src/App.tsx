@@ -45,8 +45,25 @@ function AppContent() {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [allCompStudents, setAllCompStudents] = useState<Record<string, Student[]>>({});
-  const [seatsByComp, setSeatsByComp] = useState<Record<string, number>>({});
+  const [seatsByComp, setSeatsByComp] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem('rgsu_seats_by_comp');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [loadingAllDirs, setLoadingAllDirs] = useState(false);
+
+  useEffect(() => {
+    if (Object.keys(seatsByComp).length > 0) {
+      try {
+        localStorage.setItem('rgsu_seats_by_comp', JSON.stringify(seatsByComp));
+      } catch (err) {
+        console.warn('Failed to save seats to localStorage:', err);
+      }
+    }
+  }, [seatsByComp]);
 
   const myPositionModalRef = useRef<HTMLInputElement | null>(null);
 
@@ -154,11 +171,12 @@ function AppContent() {
   const needAllCompData = searchIsCode || activeView === 'distribution' || activeView === 'my-position';
 
   useEffect(() => {
-    if (!needAllCompData) return;
     const pending = competitions.filter(c => !allCompStudents[c.id]);
     if (pending.length === 0) return;
     let cancelled = false;
-    setLoadingAllDirs(true);
+    if (needAllCompData) {
+      setLoadingAllDirs(true);
+    }
     fetchAllCompetitions(pending, {
       concurrency: 2,
       delayMs: 350,
