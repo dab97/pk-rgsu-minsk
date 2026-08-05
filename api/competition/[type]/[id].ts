@@ -57,7 +57,7 @@ async function fetchHtml(url: string): Promise<string> {
 async function fetchAndParse(type: string, id: string): Promise<CacheEntry> {
   const url = `https://pk.rgsu.net/${type}/${id}`;
   const html = await fetchHtml(url);
-  const result = parseRgsuHtml(html, type);
+  const result = await parseRgsuHtml(html, type);
   const entry: CacheEntry = { data: result, fetchedAt: Date.now() };
   cache.set(`${type}:${id}`, entry);
   return entry;

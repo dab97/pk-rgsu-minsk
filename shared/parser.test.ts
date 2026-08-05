@@ -68,8 +68,8 @@ const brokenHtml = `
 
 describe('parseRgsuHtml', () => {
   describe('competition type', () => {
-    it('parses students correctly', () => {
-      const result = parseRgsuHtml(competitionHtml, 'competition');
+    it('parses students correctly', async () => {
+      const result = await parseRgsuHtml(competitionHtml, 'competition');
 
       expect(result.students).toHaveLength(2);
       expect(result.students[0].uniqueCode).toBe('ABC123');
@@ -80,26 +80,26 @@ describe('parseRgsuHtml', () => {
       expect(result.students[0].priority).toBe(1);
     });
 
-    it('parses seats correctly', () => {
-      const result = parseRgsuHtml(competitionHtml, 'competition');
+    it('parses seats correctly', async () => {
+      const result = await parseRgsuHtml(competitionHtml, 'competition');
       expect(result.seats).toBe(16);
     });
 
-    it('parses updatedAt correctly', () => {
-      const result = parseRgsuHtml(competitionHtml, 'competition');
+    it('parses updatedAt correctly', async () => {
+      const result = await parseRgsuHtml(competitionHtml, 'competition');
       expect(result.updatedAt).toBe('01.08.2026 12:00');
     });
 
-    it('parses higherPassingPriority for competition type', () => {
-      const result = parseRgsuHtml(competitionHtml, 'competition');
+    it('parses higherPassingPriority for competition type', async () => {
+      const result = await parseRgsuHtml(competitionHtml, 'competition');
       expect(result.students[0].mainHigherPriority).toBeDefined();
       expect(result.students[0].higherPassingPriority).toBeDefined();
     });
   });
 
   describe('contest type', () => {
-    it('parses students correctly', () => {
-      const result = parseRgsuHtml(contestHtml, 'contest');
+    it('parses students correctly', async () => {
+      const result = await parseRgsuHtml(contestHtml, 'contest');
 
       expect(result.students).toHaveLength(1);
       expect(result.students[0].uniqueCode).toBe('XYZ789');
@@ -107,34 +107,34 @@ describe('parseRgsuHtml', () => {
       expect(result.students[0].semesterPayment).toBe('Да');
     });
 
-    it('parses seats correctly', () => {
-      const result = parseRgsuHtml(contestHtml, 'contest');
+    it('parses seats correctly', async () => {
+      const result = await parseRgsuHtml(contestHtml, 'contest');
       expect(result.seats).toBe(45);
     });
 
-    it('sets mainHigherPriority and higherPassingPriority to - for contest', () => {
-      const result = parseRgsuHtml(contestHtml, 'contest');
+    it('sets mainHigherPriority and higherPassingPriority to - for contest', async () => {
+      const result = await parseRgsuHtml(contestHtml, 'contest');
       expect(result.students[0].mainHigherPriority).toBe('-');
       expect(result.students[0].higherPassingPriority).toBe('-');
     });
   });
 
   describe('edge cases', () => {
-    it('returns empty students for HTML without table', () => {
-      const result = parseRgsuHtml(emptyHtml, 'competition');
+    it('returns empty students for HTML without table', async () => {
+      const result = await parseRgsuHtml(emptyHtml, 'competition');
       expect(result.students).toHaveLength(0);
       expect(result.seats).toBe(8);
       expect(result.warnings).toContain('Таблица с данными не найдена на странице.');
     });
 
-    it('returns warnings for completely broken HTML', () => {
-      const result = parseRgsuHtml(brokenHtml, 'competition');
+    it('returns warnings for completely broken HTML', async () => {
+      const result = await parseRgsuHtml(brokenHtml, 'competition');
       expect(result.students).toHaveLength(0);
       expect(result.seats).toBe(0);
       expect(result.warnings.length).toBeGreaterThan(0);
     });
 
-    it('skips rows with insufficient cells', () => {
+    it('skips rows with insufficient cells', async () => {
       const html = `
         <html><body>
           <table><tbody>
@@ -145,12 +145,12 @@ describe('parseRgsuHtml', () => {
           </tbody></table>
         </body></html>
       `;
-      const result = parseRgsuHtml(html, 'competition');
+      const result = await parseRgsuHtml(html, 'competition');
       expect(result.students).toHaveLength(1);
       expect(result.students[0].uniqueCode).toBe('XYZ123');
     });
 
-    it('skips rows with dash as uniqueCode', () => {
+    it('skips rows with dash as uniqueCode', async () => {
       const html = `
         <html><body>
           <table><tbody>
@@ -160,23 +160,23 @@ describe('parseRgsuHtml', () => {
           </tbody></table>
         </body></html>
       `;
-      const result = parseRgsuHtml(html, 'competition');
+      const result = await parseRgsuHtml(html, 'competition');
       expect(result.students).toHaveLength(0);
     });
 
-    it('parses updatedAt with different formats', () => {
+    it('parses updatedAt with different formats', async () => {
       const html = `
         <html><body>
           <div class="main-screen__text">Сведения обновлены: 15.07.2026</div>
         </body></html>
       `;
-      const result = parseRgsuHtml(html, 'competition');
+      const result = await parseRgsuHtml(html, 'competition');
       expect(result.updatedAt).toBe('15.07.2026');
     });
 
-    it('returns null updatedAt when not found', () => {
+    it('returns null updatedAt when not found', async () => {
       const html = `<html><body><div class="main-screen__text">Нет данных</div></body></html>`;
-      const result = parseRgsuHtml(html, 'competition');
+      const result = await parseRgsuHtml(html, 'competition');
       expect(result.updatedAt).toBeNull();
     });
   });

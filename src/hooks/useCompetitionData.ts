@@ -41,6 +41,8 @@ export function useCompetitionData(
   }, [seatsByComp]);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function loadData() {
       const comp = competitions.find(c => c.id === selectedCompId) || competitions[0];
       if (!comp || comp.basis !== activeBasis) {
@@ -53,6 +55,7 @@ export function useCompetitionData(
         const { type: compType, id: compUrlId } = getCompetitionPath(comp.url);
         if (compUrlId) {
           const data = await fetchCompetitionDataWithRetry(compType, compUrlId);
+          if (cancelled) return;
           if (data.students.length > 0) {
             setFetchedStudents(data.students);
             setUpdatedAt(data.updatedAt ?? null);
@@ -64,15 +67,18 @@ export function useCompetitionData(
           }
         }
       } catch (err: any) {
+        if (cancelled) return;
         console.warn('Не удалось загрузить данные. Ошибка:', err.message);
         setFetchError('Сервер РГСУ не ответил или заблокировал запрос. Попробуйте обновить страницу позже.');
         setFetchedStudents([]);
         setUpdatedAt(null);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
     loadData();
+
+    return () => { cancelled = true; };
   }, [selectedCompId, activeBasis]);
 
   return { students: fetchedStudents, updatedAt, setUpdatedAt, isLoading, fetchError, seatsByComp, setSeatsByComp };

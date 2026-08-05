@@ -1,4 +1,4 @@
-import * as cheerio from 'cheerio';
+import type { CheerioAPI } from 'cheerio';
 
 export type ParsedStudent = {
   id: string;
@@ -30,7 +30,7 @@ export type ParseResult = {
 const parseNum = (text: string): number => parseInt(text.trim(), 10) || 0;
 const parseStr = (text: string): string => text.trim();
 
-function parseContestRow($: cheerio.CheerioAPI, cells: any, index: number): ParsedStudent | null {
+function parseContestRow($: CheerioAPI, cells: any, index: number): ParsedStudent | null {
   try {
     const uniqueCode = parseStr($(cells[1]).text());
     if (!uniqueCode || uniqueCode === '-') return null;
@@ -59,7 +59,7 @@ function parseContestRow($: cheerio.CheerioAPI, cells: any, index: number): Pars
   }
 }
 
-function parseCompetitionRow($: cheerio.CheerioAPI, cells: any, index: number): ParsedStudent | null {
+function parseCompetitionRow($: CheerioAPI, cells: any, index: number): ParsedStudent | null {
   try {
     const uniqueCode = parseStr($(cells[1]).text());
     if (!uniqueCode || uniqueCode === '-') return null;
@@ -87,7 +87,8 @@ function parseCompetitionRow($: cheerio.CheerioAPI, cells: any, index: number): 
   }
 }
 
-export function parseRgsuHtml(html: string, type: string): ParseResult {
+export async function parseRgsuHtml(html: string, type: string): Promise<ParseResult> {
+  const cheerio = await import('cheerio');
   const $ = cheerio.load(html);
   const students: ParsedStudent[] = [];
   const warnings: string[] = [];

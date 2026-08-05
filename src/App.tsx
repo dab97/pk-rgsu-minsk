@@ -80,7 +80,6 @@ function AppContent() {
 
   const { allCompStudents, loadingAllDirs } = useAllCompetitions(
     needAllCompData,
-    seatsOf,
     setSeatsByComp,
     setUpdatedAt
   );

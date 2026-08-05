@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { competitions, Competition, Student } from '../data';
+import React, { useState, useEffect, useRef } from 'react';
+import { competitions, Student } from '../data';
 import { fetchAllCompetitions } from '../lib/api';
 
 type UseAllCompetitionsResult = {
@@ -9,20 +9,22 @@ type UseAllCompetitionsResult = {
 
 export function useAllCompetitions(
   needAllCompData: boolean,
-  seatsOf: (comp: Competition) => number,
   setSeatsByComp: React.Dispatch<React.SetStateAction<Record<string, number>>>,
   setUpdatedAt: React.Dispatch<React.SetStateAction<string | null>>
 ): UseAllCompetitionsResult {
   const [allCompStudents, setAllCompStudents] = useState<Record<string, Student[]>>({});
   const [loadingAllDirs, setLoadingAllDirs] = useState(false);
+  const fetchedIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    const pending = competitions.filter(c => !allCompStudents[c.id]);
+    if (!needAllCompData) return;
+
+    const pending = competitions.filter(c => !fetchedIdsRef.current.has(c.id));
     if (pending.length === 0) return;
+
     const controller = new AbortController();
-    if (needAllCompData) {
-      setLoadingAllDirs(true);
-    }
+    setLoadingAllDirs(true);
+
     fetchAllCompetitions(pending, {
       concurrency: 2,
       delayMs: 350,
@@ -33,6 +35,7 @@ export function useAllCompetitions(
       const updates: string[] = [];
       Object.entries(map).forEach(([compId, data]) => {
         studentsMap[compId] = data.students;
+        fetchedIdsRef.current.add(compId);
         if (data.updatedAt) updates.push(data.updatedAt);
         if (data.seats > 0) seatsMap[compId] = data.seats;
       });
@@ -44,8 +47,9 @@ export function useAllCompetitions(
     }).catch(() => {
       setLoadingAllDirs(false);
     });
+
     return () => { controller.abort(); };
-  }, [needAllCompData, allCompStudents]);
+  }, [needAllCompData, setSeatsByComp, setUpdatedAt]);
 
   return { allCompStudents, loadingAllDirs };
 }
