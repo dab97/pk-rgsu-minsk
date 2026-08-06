@@ -14,8 +14,8 @@ import {
   Target01Icon,
   BarChartIcon,
   CancelCircleIcon,
+  FilterHorizontalIcon,
 } from 'hugeicons-react';
-import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
@@ -53,17 +53,18 @@ export function PaidListsView({
     paidCompetitions[0]?.id || 'psychology-fulltime-contract'
   );
   const [passingOnly, setPassingOnly] = useState<boolean>(false);
+  const [hasContractOnly, setHasContractOnly] = useState<boolean>(false);
   const [hasPaymentOnly, setHasPaymentOnly] = useState<boolean>(false);
-  const [hasOriginalOnly, setHasOriginalOnly] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
 
   // Calculate allocation across all 6 paid directions taking into account priorities
   const allocationResults = useMemo(() => {
     return computePaidEnrollmentAllocation(paidCompetitions, allCompStudents, {
       paidOnly: hasPaymentOnly,
-      originalOnly: hasOriginalOnly,
+      contractOnly: hasContractOnly,
     });
-  }, [paidCompetitions, allCompStudents, hasPaymentOnly, hasOriginalOnly]);
+  }, [paidCompetitions, allCompStudents, hasPaymentOnly, hasContractOnly]);
 
   // Pre-index student applications across paid directions into an O(1) lookup Map
   const studentPaidAppsMap = useMemo(() => {
@@ -183,8 +184,8 @@ export function PaidListsView({
         </div>
       </div>
 
-      {/* ── Direction Selector Tabs Bar (Clean flat horizontal row) ── */}
-      <div className="flex items-center gap-3 overflow-x-auto no-scrollbar mb-6 pb-1">
+      {/* ── Direction Selector Tabs Bar (Equal-width grid columns) ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         {paidCompetitions.map((comp) => {
           const res = allocationResults[comp.id];
           const passingCount = res?.passingCount || 0;
@@ -196,24 +197,24 @@ export function PaidListsView({
               key={comp.id}
               onClick={() => setSelectedCompId(comp.id)}
               className={cn(
-                "px-4.5 py-3 rounded-2xl transition-all text-left shrink-0 flex flex-col justify-center gap-1 border cursor-pointer min-w-44",
+                "px-3.5 py-3 rounded-2xl transition-all text-left flex flex-col justify-center gap-1 border cursor-pointer min-w-0 w-full",
                 isSelected
-                  ? "bg-amber-600 border-amber-600 text-white font-semibold"
+                  ? "bg-amber-600 border-amber-600 text-white font-semibold shadow-xs"
                   : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/80"
               )}
             >
               <div className="text-sm font-semibold leading-snug flex items-center justify-between gap-2">
-                <span className="truncate">{shortTitle}</span>
+                <span className="truncate" title={shortTitle}>{shortTitle}</span>
               </div>
               <div
                 className={cn(
-                  "text-xs font-normal flex items-center gap-1.5 leading-none mt-0.5",
+                  "text-xs font-normal flex items-center gap-1.5 leading-none mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis",
                   isSelected ? "text-amber-100 font-medium" : "text-slate-500 dark:text-slate-400"
                 )}
               >
-                <span>{comp.studyForm}</span>
-                <span className="opacity-40">•</span>
-                <span className="tabular-nums font-semibold">{passingCount}/{comp.seats} мест</span>
+                <span className="truncate">{comp.studyForm}</span>
+                <span className="opacity-40 shrink-0">•</span>
+                <span className="tabular-nums font-semibold shrink-0">{passingCount}/{comp.seats} мест</span>
               </div>
             </button>
           );
@@ -295,118 +296,142 @@ export function PaidListsView({
         </div>
       )}
 
-      {/* Dedicated Direction Table Card */}
-      <Card id="paid-lists-print-area" className="flex flex-col flex-1 shadow-xs border-slate-200 dark:border-slate-800">
-        <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4 print:pb-3 print:border-none print:p-0">
-          {/* Official Document Print Header (Only visible in Print/PDF) */}
-          <div className="hidden print:block mb-3 text-slate-900">
-            <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-1 flex items-center justify-between">
-              <span>Филиал РГСУ в г. Минске</span>
-              <span>Приёмная комиссия — 2026</span>
-            </div>
-            <h1 className="text-base font-bold uppercase tracking-tight text-slate-900">
-              Ранжированный конкурсный список (Платное обучение)
-            </h1>
-            <div className="text-xs font-medium text-slate-800 mt-1 flex items-center justify-between">
-              <span>Направление: <strong>{selectedResult ? selectedResult.comp.title : ''} ({selectedResult?.comp.studyForm})</strong></span>
-              <span>Количество мест: <strong>{selectedResult?.seats}</strong></span>
-            </div>
+      {/* Dedicated Direction Table Section (Flat Header + Single Clean Table Container) */}
+      <div id="paid-lists-print-area" className="flex flex-col gap-4">
+        {/* Official Document Print Header (Only visible in Print/PDF) */}
+        <div className="hidden print:block mb-1 text-slate-900">
+          <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-1 flex items-center justify-between">
+            <span>Филиал РГСУ в г. Минске</span>
+            <span>Приёмная комиссия — 2026</span>
+          </div>
+          <h1 className="text-base font-bold uppercase tracking-tight text-slate-900">
+            Ранжированный конкурсный список (Платное обучение)
+          </h1>
+          <div className="text-xs font-medium text-slate-800 mt-1 flex items-center justify-between">
+            <span>Направление: <strong>{selectedResult ? selectedResult.comp.title : ''} ({selectedResult?.comp.studyForm})</strong></span>
+            <span>Количество мест: <strong>{selectedResult?.seats}</strong></span>
+          </div>
+        </div>
+
+        {/* Web Header & Controls Toolbar */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 print:hidden">
+          <div>
+            <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <span>{selectedResult ? selectedResult.comp.title : 'Конкурсный список'}</span>
+              {selectedResult && (
+                <Badge variant="secondary" className="text-xs font-normal">
+                  {selectedResult.comp.studyForm} • {selectedResult.seats} мест
+                </Badge>
+              )}
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Официальный ранжированный список по 5 критериям с распределением по высшим приоритетам
+            </p>
           </div>
 
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 print:hidden">
-            <div>
-              <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                <span>{selectedResult ? selectedResult.comp.title : 'Конкурсный список'}</span>
-                {selectedResult && (
-                  <Badge variant="secondary" className="text-xs font-normal">
-                    {selectedResult.comp.studyForm} • {selectedResult.seats} мест
-                  </Badge>
-                )}
-              </CardTitle>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Официальный ранжированный список по 5 критериям с распределением по высшим приоритетам
-              </p>
+          {/* Controls Toolbar */}
+          <div className="flex items-center gap-2.5 print:hidden w-full lg:w-auto">
+            {/* Expanded Search Input */}
+            <div className="relative flex-1 lg:w-80 lg:flex-initial">
+              <Search01Icon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <Input
+                type="text"
+                placeholder="Поиск по уникальному коду..."
+                aria-label="Поиск по уникальному коду"
+                className="pl-9 h-10 text-xs sm:text-sm w-full rounded-xl border border-slate-200 dark:border-slate-800 focus-visible:ring-1 focus-visible:ring-amber-500 focus-visible:ring-offset-0 focus-visible:border-amber-500 bg-white dark:bg-slate-900"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
             </div>
 
-            {/* Controls */}
-            <div className="flex flex-wrap items-center gap-2.5 print:hidden">
-              {/* Search input */}
-              <div className="relative w-full sm:w-64">
-                <Search01Icon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                <Input
-                  type="text"
-                  placeholder="Поиск по СНИЛС / коду..."
-                  aria-label="Поиск по условному коду"
-                  className="pl-9 h-10 text-xs sm:text-sm w-full rounded-xl border border-slate-200 dark:border-slate-800 focus-visible:ring-1 focus-visible:ring-amber-500 focus-visible:ring-offset-0 focus-visible:border-amber-500"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
+            {/* Filter Dropdown Popover */}
+            {(() => {
+              const activeFiltersCount = (passingOnly ? 1 : 0) + (hasContractOnly ? 1 : 0) + (hasPaymentOnly ? 1 : 0);
+              return (
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                    className={cn(
+                      "inline-flex items-center gap-2 px-3.5 h-10 rounded-xl border text-xs sm:text-sm font-medium transition-all cursor-pointer shadow-xs select-none",
+                      activeFiltersCount > 0
+                        ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300"
+                        : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    )}
+                  >
+                    <FilterHorizontalIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                    <span>Фильтры</span>
+                    {activeFiltersCount > 0 && (
+                      <span className="w-5 h-5 rounded-full bg-amber-600 text-white text-[11px] font-bold flex items-center justify-center tabular-nums ml-0.5">
+                        {activeFiltersCount}
+                      </span>
+                    )}
+                  </button>
 
-              {/* Passing only checkbox */}
-              <div
-                className={cn(
-                  "flex items-center space-x-2 px-3 h-10 rounded-xl border text-xs sm:text-sm transition-colors cursor-pointer",
-                  passingOnly
-                    ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300"
-                    : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
-                )}
-              >
-                <Checkbox
-                  id="paid-passing-only"
-                  checked={passingOnly}
-                  onCheckedChange={(checked) => setPassingOnly(!!checked)}
-                  className="border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600"
-                />
-                <Label htmlFor="paid-passing-only" className="cursor-pointer text-xs sm:text-sm font-medium whitespace-nowrap">
-                  Только проходящие
-                </Label>
-              </div>
+                  {isFilterOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsFilterOpen(false)} />
+                      <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-3 z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-2.5">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 px-1">
+                          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Фильтры списка</span>
+                          {activeFiltersCount > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPassingOnly(false);
+                                setHasContractOnly(false);
+                                setHasPaymentOnly(false);
+                              }}
+                              className="text-xs font-medium text-amber-600 hover:underline cursor-pointer"
+                            >
+                              Сбросить
+                            </button>
+                          )}
+                        </div>
 
-              {/* Has payment checkbox */}
-              <div
-                className={cn(
-                  "flex items-center space-x-2 px-3 h-10 rounded-xl border text-xs sm:text-sm transition-colors cursor-pointer",
-                  hasPaymentOnly
-                    ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300"
-                    : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
-                )}
-              >
-                <Checkbox
-                  id="paid-payment-only"
-                  checked={hasPaymentOnly}
-                  onCheckedChange={(checked) => setHasPaymentOnly(!!checked)}
-                  className="border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600"
-                />
-                <Label htmlFor="paid-payment-only" className="cursor-pointer text-xs sm:text-sm font-medium whitespace-nowrap">
-                  Только с оплатой
-                </Label>
-              </div>
+                        {/* Option 1 */}
+                        <label className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors">
+                          <Checkbox
+                            id="paid-passing-only"
+                            checked={passingOnly}
+                            onCheckedChange={(checked) => setPassingOnly(!!checked)}
+                            className="border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600 data-[state=checked]:text-white"
+                          />
+                          <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">Только проходящие</span>
+                        </label>
 
-              {/* Has original checkbox */}
-              <div
-                className={cn(
-                  "flex items-center space-x-2 px-3 h-10 rounded-xl border text-xs sm:text-sm transition-colors cursor-pointer",
-                  hasOriginalOnly
-                    ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300"
-                    : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300"
-                )}
-              >
-                <Checkbox
-                  id="paid-original-only"
-                  checked={hasOriginalOnly}
-                  onCheckedChange={(checked) => setHasOriginalOnly(!!checked)}
-                  className="border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600"
-                />
-                <Label htmlFor="paid-original-only" className="cursor-pointer text-xs sm:text-sm font-medium whitespace-nowrap">
-                  Оригинал
-                </Label>
-              </div>
-            </div>
+                        {/* Option 2: Contract */}
+                        <label className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors">
+                          <Checkbox
+                            id="paid-contract-only"
+                            checked={hasContractOnly}
+                            onCheckedChange={(checked) => setHasContractOnly(!!checked)}
+                            className="border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600 data-[state=checked]:text-white"
+                          />
+                          <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">Заключен договор</span>
+                        </label>
+
+                        {/* Option 3: Payment */}
+                        <label className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors">
+                          <Checkbox
+                            id="paid-payment-only"
+                            checked={hasPaymentOnly}
+                            onCheckedChange={(checked) => setHasPaymentOnly(!!checked)}
+                            className="border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600 data-[state=checked]:text-white"
+                          />
+                          <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">Только с оплатой</span>
+                        </label>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
           </div>
-        </CardHeader>
+        </div>
 
-        <CardContent className="p-0">
+        {/* Clean Table Card Container */}
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden shadow-xs">
           {loading && loadedDirsCount === 0 ? (
             <div className="flex items-center justify-center p-12 text-sm text-slate-500 gap-2">
               <RefreshIcon className="w-5 h-5 animate-spin text-amber-500" />
@@ -453,9 +478,9 @@ export function PaidListsView({
                         <TableRow
                           key={`${item.student.id}-${idx}`}
                           className={cn(
-                            isPassing ? "bg-emerald-50/40 dark:bg-emerald-950/20" : "",
+                            isPassing ? "bg-amber-50/40 dark:bg-amber-950/20" : "",
                             isWithdrawn ? "opacity-60 bg-slate-50/50 dark:bg-slate-900/40" : "",
-                            isLastSeat ? "border-b-2 border-emerald-500 dark:border-emerald-600" : ""
+                            isLastSeat ? "border-b-2 border-amber-500 dark:border-amber-600" : ""
                           )}
                         >
                           <TableCell className="text-center text-slate-500 tabular-nums font-mono py-2 px-1.5">
@@ -463,7 +488,7 @@ export function PaidListsView({
                           </TableCell>
                           <TableCell className="text-center font-bold tabular-nums py-2 px-1.5">
                             {item.effectiveRank !== null ? (
-                              <span className={cn(isPassing ? "text-emerald-700 dark:text-emerald-300" : "text-slate-600 dark:text-slate-400")}>
+                              <span className={cn(isPassing ? "text-amber-700 dark:text-amber-300" : "text-slate-600 dark:text-slate-400")}>
                                 {item.effectiveRank}
                               </span>
                             ) : (
@@ -477,7 +502,7 @@ export function PaidListsView({
                             <div className="flex justify-center">
                               <span
                                 className={cn(
-                                  "w-6 h-6 rounded-lg inline-flex items-center justify-center text-xs font-bold tabular-nums transition-all",
+                                  "w-6 h-6 rounded-full inline-flex items-center justify-center text-xs font-bold tabular-nums transition-all",
                                   isPriority1
                                     ? "bg-amber-500 text-white dark:bg-amber-600 shadow-xs"
                                     : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
@@ -560,59 +585,59 @@ export function PaidListsView({
                                     </div>
                                     <div className="flex flex-col gap-1.5">
                                       {(studentPaidAppsMap.get(item.student.uniqueCode) || []).map((app, appIdx) => (
-                                          <div
-                                            key={appIdx}
+                                        <div
+                                          key={appIdx}
+                                          className={cn(
+                                            "grid grid-cols-[1.25rem_1fr_2.5rem_1.25rem] items-center gap-2 p-1.5 rounded-xl text-xs border transition-all",
+                                            app.isEnrolledHere
+                                              ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-medium"
+                                              : "bg-slate-50/50 dark:bg-slate-800/30 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                                          )}
+                                        >
+                                          {/* Col 1: Priority */}
+                                          <span
                                             className={cn(
-                                              "grid grid-cols-[1.25rem_1fr_2.5rem_1.25rem] items-center gap-2 p-1.5 rounded-xl text-xs border transition-all",
+                                              "w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold shrink-0 tabular-nums leading-none",
                                               app.isEnrolledHere
-                                                ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-medium"
-                                                : "bg-slate-50/50 dark:bg-slate-800/30 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                                                ? "bg-emerald-600 text-white"
+                                                : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
                                             )}
                                           >
-                                            {/* Col 1: Priority */}
-                                            <span
-                                              className={cn(
-                                                "w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold shrink-0 tabular-nums leading-none",
-                                                app.isEnrolledHere
-                                                  ? "bg-emerald-600 text-white"
-                                                  : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                                              )}
-                                            >
-                                              {app.priority}
-                                            </span>
+                                            {app.priority}
+                                          </span>
 
-                                            {/* Col 2: Title & Form */}
-                                            <span className="truncate text-[11px] font-medium leading-none flex items-baseline gap-1">
-                                              <span>{app.compTitle}</span>
-                                              <span className="opacity-50 font-normal text-[10px]">({app.studyForm})</span>
-                                            </span>
+                                          {/* Col 2: Title & Form */}
+                                          <span className="truncate text-[11px] font-medium leading-none flex items-baseline gap-1">
+                                            <span>{app.compTitle}</span>
+                                            <span className="opacity-50 font-normal text-[10px]">({app.studyForm})</span>
+                                          </span>
 
-                                            {/* Col 3: Points */}
-                                            <span className="text-right text-[11px] font-bold tabular-nums text-slate-800 dark:text-slate-200 leading-none">
-                                              {app.totalPoints}
-                                            </span>
+                                          {/* Col 3: Points */}
+                                          <span className="text-right text-[11px] font-bold tabular-nums text-slate-800 dark:text-slate-200 leading-none">
+                                            {app.totalPoints}
+                                          </span>
 
-                                            {/* Col 4: Status Icon */}
-                                            <div
-                                              className="flex items-center justify-end"
-                                              title={
-                                                app.status === 'passing'
-                                                  ? 'Зачислен'
-                                                  : app.status === 'withdrawn'
+                                          {/* Col 4: Status Icon */}
+                                          <div
+                                            className="flex items-center justify-end"
+                                            title={
+                                              app.status === 'passing'
+                                                ? 'Зачислен'
+                                                : app.status === 'withdrawn'
                                                   ? 'Выбыл на высший приоритет'
                                                   : 'В конкурсе'
-                                              }
-                                            >
-                                              {app.status === 'passing' ? (
-                                                <CheckmarkCircle01Icon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                                              ) : app.status === 'withdrawn' ? (
-                                                <CancelCircleIcon className="w-4 h-4 text-amber-500/80 dark:text-amber-400/80 shrink-0" />
-                                              ) : (
-                                                <Clock01Icon className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
-                                              )}
-                                            </div>
+                                            }
+                                          >
+                                            {app.status === 'passing' ? (
+                                              <CheckmarkCircle01Icon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                            ) : app.status === 'withdrawn' ? (
+                                              <CancelCircleIcon className="w-4 h-4 text-amber-500/80 dark:text-amber-400/80 shrink-0" />
+                                            ) : (
+                                              <Clock01Icon className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                                            )}
                                           </div>
-                                        ))}
+                                        </div>
+                                      ))}
                                     </div>
                                   </TooltipContent>
                                 </Tooltip>
@@ -652,8 +677,8 @@ export function PaidListsView({
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

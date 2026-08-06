@@ -8,7 +8,6 @@ import {
   Alert01Icon,
   GraduationScrollIcon,
 } from 'hugeicons-react';
-import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
@@ -80,72 +79,74 @@ export function CompetitionTable({
   accent,
 }: CompetitionTableProps) {
   return (
-    <Card className="flex flex-col flex-1">
-      <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <CardTitle className="text-lg">Конкурсный список</CardTitle>
+    <div className="flex flex-col gap-4 flex-1">
+      {/* Flat Header Toolbar (matching DistributionView pattern) */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
+            Конкурсный список
+          </h2>
+        </div>
+        <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full lg:w-auto">
+          <div className="relative w-full sm:w-80 md:w-96">
+            <Search01Icon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Input
+              type="text"
+              placeholder="Поиск по уникальному коду..."
+              aria-label="Поиск по уникальному коду"
+              className="pl-9 w-full bg-white dark:bg-slate-900"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
-          <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 w-full lg:w-auto">
-            <div className="relative w-full sm:w-64">
-              <Search01Icon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-              <Input
-                type="text"
-                placeholder="Поиск по уникальному коду..."
-                aria-label="Поиск по уникальному коду"
-                className="pl-9 w-full"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div
+          <div
+            className={cn(
+              "flex items-center space-x-2 px-3 h-10 rounded-xl border w-full sm:w-auto transition-colors",
+              consentOnly
+                ? cn(accent.cardBorder, accent.pillBg)
+                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+            )}
+          >
+            <Checkbox
+              id="consent-only"
+              checked={consentOnly}
+              onCheckedChange={(checked) => setConsentOnly(!!checked)}
+              className={accent.checkbox}
+            />
+            <Label htmlFor="consent-only" className={cn("cursor-pointer text-sm font-medium", accent.text)}>
+              {activeBasis === 'Бюджет' ? 'Высший проходной приоритет' : 'С договором'}
+            </Label>
+          </div>
+          <div className="md:hidden flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1 h-10 w-full sm:w-auto">
+            <button
+              onClick={() => { setActiveBasis('Бюджет'); setSearchQuery(''); }}
               className={cn(
-                "flex items-center space-x-2 px-3 h-10 rounded-xl border w-full sm:w-auto transition-colors",
-                consentOnly
-                  ? cn(accent.cardBorder, accent.pillBg)
-                  : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800"
+                "flex-1 flex items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                activeBasis === 'Бюджет'
+                  ? "bg-white text-teal-700 dark:bg-slate-900 dark:text-teal-300"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               )}
             >
-              <Checkbox
-                id="consent-only"
-                checked={consentOnly}
-                onCheckedChange={(checked) => setConsentOnly(!!checked)}
-                className={accent.checkbox}
-              />
-              <Label htmlFor="consent-only" className={cn("cursor-pointer text-sm font-medium", accent.text)}>
-                {activeBasis === 'Бюджет' ? 'Высший проходной приоритет' : 'С договором'}
-              </Label>
-            </div>
-            <div className="md:hidden flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1 h-10 w-full sm:w-auto">
-              <button
-                onClick={() => { setActiveBasis('Бюджет'); setSearchQuery(''); }}
-                className={cn(
-                  "flex-1 flex items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                  activeBasis === 'Бюджет'
-                    ? "bg-white text-teal-700 dark:bg-slate-900 dark:text-teal-300"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                )}
-              >
-                Бюджет
-              </button>
-              <button
-                onClick={() => { setActiveBasis('Платное'); setSearchQuery(''); }}
-                className={cn(
-                  "flex-1 flex items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
-                  activeBasis === 'Платное'
-                    ? "bg-white text-amber-700 dark:bg-slate-900 dark:text-amber-300"
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                )}
-              >
-                Платное
-              </button>
-            </div>
+              Бюджет
+            </button>
+            <button
+              onClick={() => { setActiveBasis('Платное'); setSearchQuery(''); }}
+              className={cn(
+                "flex-1 flex items-center justify-center rounded-md px-3 text-xs font-medium transition-colors",
+                activeBasis === 'Платное'
+                  ? "bg-white text-amber-700 dark:bg-slate-900 dark:text-amber-300"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              )}
+            >
+              Платное
+            </button>
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="m-6 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-          <Table className="min-w-162.5 sm:min-w-full text-xs">
+      </div>
+
+      {/* Clean Table Card Container */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs">
+        <Table className="min-w-162.5 sm:min-w-full text-xs">
             <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
               <TableRow>
                 <TableHead className="w-16 text-center whitespace-nowrap">№</TableHead>
@@ -330,8 +331,7 @@ export function CompetitionTable({
               )}
             </TableBody>
           </Table>
-        </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

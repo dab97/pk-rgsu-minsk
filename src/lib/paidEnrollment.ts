@@ -59,10 +59,11 @@ export function computePaidEnrollmentAllocation(
   allCompStudents: Record<string, Student[]>,
   options?: {
     paidOnly?: boolean;
+    contractOnly?: boolean;
     originalOnly?: boolean;
   }
 ): Record<string, CompetitionEnrollmentResult> {
-  const { paidOnly = false, originalOnly = false } = options || {};
+  const { paidOnly = false, contractOnly = false, originalOnly = false } = options || {};
 
   // Step 1: Prepare sorted lists for each competition
   const initialLists: Record<string, Array<{ student: Student; comp: Competition; rawRank: number }>> = {};
@@ -72,6 +73,9 @@ export function computePaidEnrollmentAllocation(
 
     if (paidOnly) {
       rawList = rawList.filter((s) => s.semesterPayment && s.semesterPayment !== 'Нет');
+    }
+    if (contractOnly) {
+      rawList = rawList.filter((s) => s.hasContract);
     }
     if (originalOnly) {
       rawList = rawList.filter((s) => s.hasOriginal);
