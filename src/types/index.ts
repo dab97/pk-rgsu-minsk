@@ -3,7 +3,7 @@ import { Competition, Student } from '../data';
 export type { Competition, Student };
 
 export type BasisType = 'Бюджет' | 'Платное';
-export type ViewType = 'competitions' | 'distribution' | 'my-position';
+export type ViewType = 'competitions' | 'distribution' | 'my-position' | 'paid-lists';
 
 export type SortConfig = {
   key: keyof Student | null;

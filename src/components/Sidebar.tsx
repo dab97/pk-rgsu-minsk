@@ -63,8 +63,8 @@ export function Sidebar({
             <div className="font-medium text-slate-900 dark:text-slate-100 line-clamp-1">{comp.title}</div>
             <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">{comp.subtitle}</div>
             <div className="flex flex-wrap gap-1 mt-1.5">
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 border-slate-200 dark:border-slate-700">{comp.studyForm}</Badge>
-              <Badge className={cn(accent.badge, "text-[10px] px-1.5 py-0")}>{comp.seats} мест</Badge>
+              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 border-slate-200 dark:border-slate-700 font-normal">{comp.studyForm}</Badge>
+              <Badge variant="outline" className={cn(accent.badge, "text-[10px] px-1.5 py-0 font-medium")}>{comp.seats} мест</Badge>
             </div>
           </button>
         ))
@@ -78,9 +78,9 @@ export function Sidebar({
         <button
           onClick={() => { setActiveBasis('Бюджет'); setActiveView('competitions'); setSearchQuery(''); }}
           className={cn(
-            "flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
-            activeBasis === 'Бюджет'
-              ? "bg-white text-teal-700 dark:bg-slate-900 dark:text-teal-300 shadow-xs"
+            "flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors cursor-pointer",
+            activeBasis === 'Бюджет' && activeView === 'competitions'
+              ? "bg-white text-teal-700 dark:bg-slate-900 dark:text-teal-300 shadow-xs font-semibold"
               : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
           )}
         >
@@ -89,9 +89,9 @@ export function Sidebar({
         <button
           onClick={() => { setActiveBasis('Платное'); setActiveView('competitions'); setSearchQuery(''); }}
           className={cn(
-            "flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors",
-            activeBasis === 'Платное'
-              ? "bg-white text-amber-700 dark:bg-slate-900 dark:text-amber-300 shadow-xs"
+            "flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors cursor-pointer",
+            activeBasis === 'Платное' && activeView === 'competitions'
+              ? "bg-white text-amber-700 dark:bg-slate-900 dark:text-amber-300 shadow-xs font-semibold"
               : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
           )}
         >
@@ -102,45 +102,65 @@ export function Sidebar({
   );
 
   const mobileNavItems = (
-    <div className="p-3 border-t border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-2 bg-slate-50/40 dark:bg-slate-900/40 shrink-0">
+    <div className="p-3 border-t border-slate-200 dark:border-slate-800 grid grid-cols-3 gap-1.5 bg-slate-50/40 dark:bg-slate-900/40 shrink-0">
       <button
         onClick={() => { setActiveView('my-position'); setSidebarOpen(false); }}
         className={cn(
-          "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all cursor-pointer",
+          "flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all cursor-pointer",
           activeView === 'my-position'
             ? "bg-white dark:bg-slate-800 border-teal-200 dark:border-teal-800/60 shadow-xs"
             : "bg-transparent border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/60"
         )}
       >
         <div className={cn(
-          "w-9 h-9 rounded-xl flex items-center justify-center transition-colors",
+          "w-8 h-8 rounded-xl flex items-center justify-center transition-colors",
           activeView === 'my-position'
             ? "bg-teal-600 text-white shadow-xs"
             : "bg-teal-50 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 border border-teal-100 dark:border-teal-900/40"
         )}>
           <UserIcon className="w-4 h-4" />
         </div>
-        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 text-center leading-tight">Моя позиция</span>
+        <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300 text-center leading-tight">Моя позиция</span>
       </button>
 
       <button
         onClick={() => { setActiveView('distribution'); setDistributionBasis(activeBasis); setSidebarOpen(false); }}
         className={cn(
-          "flex flex-col items-center gap-2 p-3 rounded-xl border transition-all cursor-pointer",
+          "flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all cursor-pointer",
           activeView === 'distribution'
             ? "bg-white dark:bg-slate-800 border-amber-200 dark:border-amber-800/60 shadow-xs"
             : "bg-transparent border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/60"
         )}
       >
         <div className={cn(
-          "w-9 h-9 rounded-xl flex items-center justify-center transition-colors",
+          "w-8 h-8 rounded-xl flex items-center justify-center transition-colors",
           activeView === 'distribution'
             ? "bg-amber-500 text-white shadow-xs"
             : "bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/40"
         )}>
           <BarChartIcon className="w-4 h-4" />
         </div>
-        <span className="text-[11px] font-medium text-slate-700 dark:text-slate-300 text-center leading-tight">Распределение</span>
+        <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300 text-center leading-tight">Распределение</span>
+      </button>
+
+      <button
+        onClick={() => { setActiveView('paid-lists'); setSidebarOpen(false); }}
+        className={cn(
+          "flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all cursor-pointer",
+          activeView === 'paid-lists'
+            ? "bg-white dark:bg-slate-800 border-amber-200 dark:border-amber-800/60 shadow-xs"
+            : "bg-transparent border-transparent hover:bg-slate-100 dark:hover:bg-slate-800/60"
+        )}
+      >
+        <div className={cn(
+          "w-8 h-8 rounded-xl flex items-center justify-center transition-colors",
+          activeView === 'paid-lists'
+            ? "bg-amber-600 text-white shadow-xs"
+            : "bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/40"
+        )}>
+          <GraduationScrollIcon className="w-4 h-4" />
+        </div>
+        <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300 text-center leading-tight">Списки платного</span>
       </button>
     </div>
   );
@@ -185,6 +205,26 @@ export function Sidebar({
           <BarChartIcon className="w-4 h-4" />
         </div>
         <span className="truncate">Распределение баллов</span>
+      </button>
+
+      <button
+        onClick={() => { setActiveView('paid-lists'); setSidebarOpen(false); }}
+        className={cn(
+          "w-full flex items-center justify-start gap-3 p-3 rounded-xl text-xs sm:text-sm font-semibold transition-all border text-left cursor-pointer",
+          activeView === 'paid-lists'
+            ? "bg-white dark:bg-slate-800 border-amber-200 dark:border-amber-800/60 shadow-xs text-slate-900 dark:text-slate-100"
+            : "bg-transparent border-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800/60"
+        )}
+      >
+        <div className={cn(
+          "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+          activeView === 'paid-lists'
+            ? "bg-amber-600 text-white shadow-xs"
+            : "bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-900/40"
+        )}>
+          <GraduationScrollIcon className="w-4 h-4" />
+        </div>
+        <span className="truncate">Списки по платному</span>
       </button>
     </div>
   );

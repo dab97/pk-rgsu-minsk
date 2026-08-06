@@ -20,6 +20,7 @@ import { StatsCards } from './components/StatsCards';
 import { CompetitionTable } from './components/CompetitionTable';
 import { DistributionView } from './components/DistributionView';
 import { MyPositionView } from './components/MyPositionView';
+import { PaidListsView } from './components/PaidListsView';
 import { MyPositionModal } from './components/MyPositionModal';
 import { SyncOverlay } from './components/SyncOverlay';
 
@@ -76,7 +77,7 @@ function AppContent() {
   }, [filteredCompetitions, selectedCompId]);
 
   const searchIsCode = /^\d{6,8}$/.test(searchQuery.trim());
-  const needAllCompData = searchIsCode || activeView === 'distribution' || activeView === 'my-position';
+  const needAllCompData = searchIsCode || activeView === 'distribution' || activeView === 'my-position' || activeView === 'paid-lists';
 
   const { allCompStudents, loadingAllDirs } = useAllCompetitions(
     needAllCompData,
@@ -106,6 +107,8 @@ function AppContent() {
       document.title = 'Мониторинг конкурсных списков РГСУ — Распределение конкурсных баллов';
     } else if (activeView === 'my-position') {
       document.title = 'Мониторинг конкурсных списков РГСУ — Моя позиция в конкурсе';
+    } else if (activeView === 'paid-lists') {
+      document.title = 'Мониторинг конкурсных списков РГСУ — Списки по платному';
     } else {
       document.title = `Мониторинг конкурсных списков РГСУ — ${selectedComp.title.replace(' — ', ' ')}`;
     }
@@ -222,7 +225,7 @@ function AppContent() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased">
       <AnimatePresence>
-        {syncVisible && <SyncOverlay />}
+        {syncVisible && <SyncOverlay isPaidLists={activeView === 'paid-lists'} />}
       </AnimatePresence>
 
       <Sidebar
@@ -272,6 +275,14 @@ function AppContent() {
                 predictedPassing={stats.predictedPassing}
                 accent={accent}
                 loadingAllDirs={loadingAllDirs}
+              />
+            ) : activeView === 'paid-lists' ? (
+              <PaidListsView
+                allCompStudents={allCompStudents}
+                loading={loadingAllDirs}
+                seatsByComp={seatsByComp}
+                updatedAt={updatedAt}
+                accent={accent}
               />
             ) : (
               <>
@@ -355,7 +366,7 @@ function AppContent() {
             onClick={() => { setActiveView('distribution'); setDistributionBasis(activeBasis); }}
             aria-current={activeView === 'distribution' ? 'page' : undefined}
             className={cn(
-              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors",
+              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] sm:text-[11px] font-medium transition-colors",
               activeView === 'distribution'
                 ? "text-teal-600 dark:text-teal-400"
                 : "text-slate-500 dark:text-slate-400"
@@ -363,6 +374,19 @@ function AppContent() {
           >
             <BarChartIcon className={cn("w-5 h-5 mb-0.5", activeView === 'distribution' ? "text-teal-600 dark:text-teal-400" : "text-slate-500 dark:text-slate-400")} />
             Распределение
+          </button>
+          <button
+            onClick={() => { setActiveView('paid-lists'); }}
+            aria-current={activeView === 'paid-lists' ? 'page' : undefined}
+            className={cn(
+              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[10px] sm:text-[11px] font-medium transition-colors",
+              activeView === 'paid-lists'
+                ? "text-amber-600 dark:text-amber-400"
+                : "text-slate-500 dark:text-slate-400"
+            )}
+          >
+            <GraduationScrollIcon className={cn("w-5 h-5 mb-0.5", activeView === 'paid-lists' ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400")} />
+            Списки платного
           </button>
         </div>
       </nav>

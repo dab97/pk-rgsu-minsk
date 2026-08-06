@@ -11,6 +11,7 @@ export type Student = {
   subjects: number[];
   priority: number;
   hasOriginal: boolean;
+  hasContract?: boolean;
   semesterPayment?: string;
   status: 'в конкурсе' | 'зачислен' | 'отказ' | '';
   mainHigherPriority: string;
