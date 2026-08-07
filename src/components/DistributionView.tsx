@@ -1,5 +1,5 @@
-import React from 'react';
-import { RefreshIcon } from 'hugeicons-react';
+import React, { useState } from 'react';
+import { RefreshIcon, FilterHorizontalIcon } from 'hugeicons-react';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
@@ -15,6 +15,9 @@ interface DistributionViewProps {
   onBasisChange: (basis: BasisType) => void;
   consentOnly: boolean;
   onConsentChange: (checked: boolean) => void;
+  excludeBudget: boolean;
+  onExcludeBudgetChange: (checked: boolean) => void;
+  budgetEnrolledCount: number;
   updatedAt?: string | null;
 }
 
@@ -26,9 +29,16 @@ export function DistributionView({
   onBasisChange,
   consentOnly,
   onConsentChange,
+  excludeBudget,
+  onExcludeBudgetChange,
+  budgetEnrolledCount,
   updatedAt,
 }: DistributionViewProps) {
   const loadedCount = rows.filter(r => r.loaded).length;
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+
+  const activeFiltersCount = (consentOnly ? 1 : 0) + (basis === 'Платное' && excludeBudget ? 1 : 0);
+
   return (
     <TooltipProvider delayDuration={100}>
       <div className="flex flex-col gap-3">
@@ -51,37 +61,15 @@ export function DistributionView({
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2 w-full lg:w-auto lg:shrink-0">
-            <div className={cn(
-              "flex items-center space-x-2 px-3 h-10 rounded-xl border transition-colors flex-1 lg:flex-initial",
-              consentOnly
-                ? basis === 'Бюджет'
-                  ? "bg-teal-50 dark:bg-teal-900/30 border-teal-200 dark:border-teal-900"
-                  : "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-900"
-                : "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-800"
-            )}>
-              <Checkbox
-                id="distribution-consent-only"
-                checked={consentOnly}
-                onCheckedChange={(checked) => onConsentChange(!!checked)}
-                className={basis === 'Бюджет'
-                  ? "border-slate-300 dark:border-slate-600 data-[state=checked]:border-teal-600 data-[state=checked]:bg-teal-600 data-[state=checked]:text-white focus-visible:ring-teal-500/40"
-                  : "border-slate-300 dark:border-slate-600 data-[state=checked]:border-amber-500 data-[state=checked]:bg-amber-500 data-[state=checked]:text-white focus-visible:ring-amber-500/40"}
-              />
-              <Label htmlFor="distribution-consent-only" className={cn(
-                "cursor-pointer text-sm font-medium whitespace-nowrap",
-                basis === 'Бюджет' ? "text-teal-600 dark:text-teal-400" : "text-amber-600 dark:text-amber-400"
-              )}>
-                С {basis === 'Бюджет' ? 'ВПП' : 'договором'}
-              </Label>
-            </div>
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:shrink-0">
+            {/* Basis Toggle Tabs */}
             <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-1 h-10 items-center flex-1 lg:flex-initial lg:w-fit">
               <button
                 onClick={() => onBasisChange('Бюджет')}
                 className={cn(
-                  "flex items-center justify-center rounded-md px-3 h-full text-xs font-medium transition-colors flex-1 lg:flex-initial",
+                  "flex items-center justify-center rounded-md px-3 h-full text-xs font-medium transition-colors flex-1 lg:flex-initial cursor-pointer",
                   basis === 'Бюджет'
-                    ? "bg-white text-teal-700 dark:bg-slate-900 dark:text-teal-300"
+                    ? "bg-white text-teal-700 dark:bg-slate-900 dark:text-teal-300 shadow-xs"
                     : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                 )}
               >
@@ -90,14 +78,106 @@ export function DistributionView({
               <button
                 onClick={() => onBasisChange('Платное')}
                 className={cn(
-                  "flex items-center justify-center rounded-md px-3 h-full text-xs font-medium transition-colors flex-1 lg:flex-initial",
+                  "flex items-center justify-center rounded-md px-3 h-full text-xs font-medium transition-colors flex-1 lg:flex-initial cursor-pointer",
                   basis === 'Платное'
-                    ? "bg-white text-amber-700 dark:bg-slate-900 dark:text-amber-300"
+                    ? "bg-white text-amber-700 dark:bg-slate-900 dark:text-amber-300 shadow-xs"
                     : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
                 )}
               >
                 Платное
               </button>
+            </div>
+
+            {/* Filter Dropdown Popover */}
+            <div className="relative shrink-0 flex-1 lg:flex-initial">
+              <button
+                type="button"
+                onClick={() => setIsFilterOpen(!isFilterOpen)}
+                className={cn(
+                  "inline-flex items-center justify-between lg:justify-start gap-2 px-3.5 h-10 w-full lg:w-auto rounded-xl border text-xs sm:text-sm font-medium transition-all cursor-pointer shadow-xs select-none",
+                  activeFiltersCount > 0
+                    ? basis === 'Бюджет'
+                      ? "bg-teal-50 dark:bg-teal-950/40 border-teal-300 dark:border-teal-800 text-teal-700 dark:text-teal-300"
+                      : "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300"
+                    : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <FilterHorizontalIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                  <span>Фильтры</span>
+                </div>
+                {activeFiltersCount > 0 && (
+                  <span className={cn(
+                    "w-5 h-5 rounded-full text-white text-[11px] font-bold flex items-center justify-center tabular-nums ml-0.5",
+                    basis === 'Бюджет' ? "bg-teal-600" : "bg-amber-600"
+                  )}>
+                    {activeFiltersCount}
+                  </span>
+                )}
+              </button>
+
+              {isFilterOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsFilterOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between pb-2 mb-0.5 border-b border-slate-100 dark:border-slate-800 px-2 pt-1">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Фильтры распределения</span>
+                      {activeFiltersCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onConsentChange(false);
+                            if (basis === 'Платное') onExcludeBudgetChange(false);
+                          }}
+                          className={cn("text-xs font-semibold hover:underline cursor-pointer", basis === 'Бюджет' ? "text-teal-600 dark:text-teal-400" : "text-amber-600 dark:text-amber-400")}
+                        >
+                          Сбросить
+                        </button>
+                      )}
+                    </div>
+
+                    {basis === 'Платное' && (
+                      <label className={cn(
+                        "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all select-none",
+                        excludeBudget
+                          ? "bg-amber-50/80 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 hover:bg-amber-100/70 dark:hover:bg-amber-900/50"
+                          : "hover:bg-slate-100/80 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-200"
+                      )}>
+                        <Checkbox
+                          id="distribution-exclude-budget"
+                          checked={excludeBudget}
+                          onCheckedChange={(checked) => onExcludeBudgetChange(!!checked)}
+                          className="w-4 h-4 rounded-md border-slate-300 dark:border-slate-600 data-[state=checked]:border-amber-500 data-[state=checked]:bg-amber-500 data-[state=checked]:text-white focus-visible:ring-amber-500/40 shrink-0"
+                        />
+                        <span className="text-sm font-medium leading-snug">
+                          Без зачисленных на бюджет ({budgetEnrolledCount})
+                        </span>
+                      </label>
+                    )}
+
+                    <label className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all select-none",
+                      consentOnly
+                        ? basis === 'Бюджет'
+                          ? "bg-teal-50/80 dark:bg-teal-950/40 text-teal-900 dark:text-teal-200 hover:bg-teal-100/70 dark:hover:bg-teal-900/50"
+                          : "bg-amber-50/80 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 hover:bg-amber-100/70 dark:hover:bg-amber-900/50"
+                        : "hover:bg-slate-100/80 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-200"
+                    )}>
+                      <Checkbox
+                        id="distribution-consent-only"
+                        checked={consentOnly}
+                        onCheckedChange={(checked) => onConsentChange(!!checked)}
+                        className={basis === 'Бюджет'
+                          ? "w-4 h-4 rounded-md border-slate-300 dark:border-slate-600 data-[state=checked]:border-teal-600 data-[state=checked]:bg-teal-600 data-[state=checked]:text-white focus-visible:ring-teal-500/40 shrink-0"
+                          : "w-4 h-4 rounded-md border-slate-300 dark:border-slate-600 data-[state=checked]:border-amber-500 data-[state=checked]:bg-amber-500 data-[state=checked]:text-white focus-visible:ring-amber-500/40 shrink-0"}
+                      />
+                      <span className="text-sm font-medium leading-snug">
+                        С {basis === 'Бюджет' ? 'ВПП (высшим приоритетом)' : 'договором'}
+                      </span>
+                    </label>
+                  </div>
+                </>
+              )}
             </div>
             <button
               onClick={() => window.print()}

@@ -38,6 +38,7 @@ function AppContent() {
 
   const [distributionBasis, setDistributionBasis] = useState<BasisType>('Бюджет');
   const [distributionConsentOnly, setDistributionConsentOnly] = useState(false);
+  const [distributionExcludeBudget, setDistributionExcludeBudget] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const myPositionModalRef = useRef<HTMLInputElement | null>(null);
@@ -84,6 +85,41 @@ function AppContent() {
     setSeatsByComp,
     setUpdatedAt
   );
+
+  const budgetEnrolledCodes = useMemo(() => {
+    const codes = new Set<string>();
+    competitions.forEach((comp) => {
+      if (comp.basis === 'Бюджет') {
+        const bStudents = allCompStudents[comp.id] || [];
+        bStudents.forEach((s) => {
+          const code = s.uniqueCode || s.id;
+          if (code && code !== '-') {
+            codes.add(code);
+            const norm = code.replace(/\D/g, '') || code.trim();
+            if (norm) codes.add(norm);
+          }
+        });
+      }
+    });
+    return codes;
+  }, [allCompStudents]);
+
+  const budgetEnrolledCount = useMemo(() => {
+    const normCodes = new Set<string>();
+    competitions.forEach((comp) => {
+      if (comp.basis === 'Бюджет') {
+        const bStudents = allCompStudents[comp.id] || [];
+        bStudents.forEach((s) => {
+          const code = s.uniqueCode || s.id;
+          if (code && code !== '-') {
+            const norm = code.replace(/\D/g, '') || code.trim();
+            normCodes.add(norm);
+          }
+        });
+      }
+    });
+    return normCodes.size;
+  }, [allCompStudents]);
 
   const syncActive = isLoading || loadingAllDirs;
   const [syncVisible, setSyncVisible] = useState(false);
@@ -184,11 +220,21 @@ function AppContent() {
         };
       }
 
+      let baseList = list;
+      if (distributionBasis === 'Платное' && distributionExcludeBudget && budgetEnrolledCodes.size > 0) {
+        baseList = baseList.filter((s) => {
+          const code = s.uniqueCode || s.id;
+          if (!code) return true;
+          const norm = code.replace(/\D/g, '') || code.trim();
+          return !budgetEnrolledCodes.has(code) && !budgetEnrolledCodes.has(norm);
+        });
+      }
+
       const filtered = distributionConsentOnly
         ? distributionBasis === 'Бюджет'
-          ? list.filter(s => s.higherPassingPriority !== '-' && s.higherPassingPriority !== 'Нет')
-          : list.filter(s => s.hasOriginal)
-        : list;
+          ? baseList.filter(s => s.higherPassingPriority !== '-' && s.higherPassingPriority !== 'Нет')
+          : baseList.filter(s => s.hasOriginal || s.hasContract)
+        : baseList;
       const sorted = [...filtered].sort((a, b) => {
         if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
         if (a.examPoints !== b.examPoints) return b.examPoints - a.examPoints;
@@ -220,7 +266,7 @@ function AppContent() {
         passingScore,
       };
     });
-  }, [distributionBasis, distributionConsentOnly, selectedComp, fetchedStudents, allCompStudents, buckets, seatsOf]);
+  }, [distributionBasis, distributionConsentOnly, distributionExcludeBudget, budgetEnrolledCodes, selectedComp, fetchedStudents, allCompStudents, buckets, seatsOf]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased">
@@ -263,6 +309,9 @@ function AppContent() {
                 onBasisChange={setDistributionBasis}
                 consentOnly={distributionConsentOnly}
                 onConsentChange={setDistributionConsentOnly}
+                excludeBudget={distributionExcludeBudget}
+                onExcludeBudgetChange={setDistributionExcludeBudget}
+                budgetEnrolledCount={budgetEnrolledCount}
                 updatedAt={updatedAt}
               />
             ) : activeView === 'my-position' ? (

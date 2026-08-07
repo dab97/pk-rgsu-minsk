@@ -41,7 +41,7 @@ function extractCells(trHtml: string): string[] {
 
 function parseCompetitionRow(cells: string[], index: number): ParsedStudent | null {
   try {
-    if (cells.length < 18) return null;
+    if (cells.length < 10) return null;
     const uniqueCode = parseStr(cells[1]);
     if (!uniqueCode || uniqueCode === '-') return null;
 
@@ -52,16 +52,16 @@ function parseCompetitionRow(cells: string[], index: number): ParsedStudent | nu
       examPoints: parseNum(cells[3]),
       subjects: [parseNum(cells[4]), parseNum(cells[5]), parseNum(cells[6])],
       achievementPoints: parseNum(cells[7]),
-      hasOriginal: parseStr(cells[8]).toLowerCase() === 'да',
-      priority: parseNum(cells[9]),
-      mainHigherPriority: parseStr(cells[10]) || '-',
-      higherPassingPriority: parseStr(cells[11]) || '-',
-      preemptiveRight1: parseStr(cells[12]) || 'Нет',
-      preemptiveRight2: parseStr(cells[13]) || 'Нет',
-      idAtEquality: parseStr(cells[14]) || 'Нет',
-      withoutExams: parseStr(cells[15]) || 'Нет',
-      basisBVI: parseStr(cells[16]) || '-',
-      status: parseStr(cells[17]) || '',
+      hasOriginal: cells[8] ? parseStr(cells[8]).toLowerCase() === 'да' : false,
+      priority: cells[9] ? parseNum(cells[9]) : 1,
+      mainHigherPriority: cells[10] ? parseStr(cells[10]) : '-',
+      higherPassingPriority: cells[11] ? parseStr(cells[11]) : '1',
+      preemptiveRight1: cells[12] ? parseStr(cells[12]) : 'Нет',
+      preemptiveRight2: cells[13] ? parseStr(cells[13]) : 'Нет',
+      idAtEquality: cells[14] ? parseStr(cells[14]) : 'Нет',
+      withoutExams: cells[15] ? parseStr(cells[15]) : 'Нет',
+      basisBVI: cells[16] ? parseStr(cells[16]) : '-',
+      status: cells[17] ? parseStr(cells[17]) : 'Зачислен',
     };
   } catch {
     return null;
@@ -70,7 +70,7 @@ function parseCompetitionRow(cells: string[], index: number): ParsedStudent | nu
 
 function parseContestRow(cells: string[], index: number): ParsedStudent | null {
   try {
-    if (cells.length < 17) return null;
+    if (cells.length < 10) return null;
     const uniqueCode = parseStr(cells[1]);
     if (!uniqueCode || uniqueCode === '-') return null;
 
@@ -81,17 +81,57 @@ function parseContestRow(cells: string[], index: number): ParsedStudent | null {
       examPoints: parseNum(cells[3]),
       subjects: [parseNum(cells[4]), parseNum(cells[5]), parseNum(cells[6])],
       achievementPoints: parseNum(cells[7]),
-      hasOriginal: parseStr(cells[8]).toLowerCase() === 'да',
-      semesterPayment: parseStr(cells[9]) || 'Нет',
-      priority: parseNum(cells[10]),
+      hasOriginal: cells[8] ? parseStr(cells[8]).toLowerCase() === 'да' : false,
+      semesterPayment: cells[9] ? parseStr(cells[9]) : 'Нет',
+      priority: cells[10] ? parseNum(cells[10]) : 1,
       mainHigherPriority: '-',
-      higherPassingPriority: '-',
-      preemptiveRight1: parseStr(cells[11]) || 'Нет',
-      preemptiveRight2: parseStr(cells[12]) || 'Нет',
-      idAtEquality: parseStr(cells[13]) || 'Нет',
-      withoutExams: parseStr(cells[14]) || 'Нет',
-      basisBVI: parseStr(cells[15]) || '-',
-      status: parseStr(cells[16]) || '',
+      higherPassingPriority: '1',
+      preemptiveRight1: cells[11] ? parseStr(cells[11]) : 'Нет',
+      preemptiveRight2: cells[12] ? parseStr(cells[12]) : 'Нет',
+      idAtEquality: cells[13] ? parseStr(cells[13]) : 'Нет',
+      withoutExams: cells[14] ? parseStr(cells[14]) : 'Нет',
+      basisBVI: cells[15] ? parseStr(cells[15]) : '-',
+      status: cells[16] ? parseStr(cells[16]) : 'Зачислен',
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseEnrolledRow(cells: string[], index: number): ParsedStudent | null {
+  try {
+    const codeCell = cells.find((c) => {
+      const str = parseStr(c);
+      return (
+        str.length >= 5 &&
+        /\d/.test(str) &&
+        !str.includes('госуслуг') &&
+        !str.includes('код') &&
+        !str.includes('№') &&
+        !str.includes('Сумма') &&
+        !str.includes('баллов')
+      );
+    });
+    if (!codeCell) return null;
+    const uniqueCode = parseStr(codeCell);
+
+    return {
+      id: `student-${index}`,
+      uniqueCode,
+      totalPoints: parseNum(cells[2] || '0'),
+      examPoints: parseNum(cells[3] || '0'),
+      subjects: [0, 0, 0],
+      achievementPoints: parseNum(cells[4] || '0'),
+      hasOriginal: true,
+      priority: 1,
+      mainHigherPriority: '1',
+      higherPassingPriority: '1',
+      preemptiveRight1: 'Нет',
+      preemptiveRight2: 'Нет',
+      idAtEquality: 'Нет',
+      withoutExams: cells[5] ? parseStr(cells[5]) : 'Нет',
+      basisBVI: cells[5] ? parseStr(cells[5]) : '-',
+      status: 'Зачислен',
     };
   } catch {
     return null;
@@ -120,29 +160,46 @@ export function parseRgsuHtml(html: string, type: string): ParseResult {
   const updMatch = html.match(/Сведения\s+обновлены:\s*([^<]+)/i);
   const updatedAt = updMatch ? updMatch[1].trim() : null;
 
-  const rowRegex = /<tr\s+data-unique-code="[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
-  let rowMatch;
-  let rowIndex = 0;
-  let skippedRows = 0;
-
-  while ((rowMatch = rowRegex.exec(html)) !== null) {
-    const trHtml = rowMatch[1];
-    const cells = extractCells(trHtml);
-    if (cells.length >= 10) {
-      const parser = type === 'contest' ? parseContestRow : parseCompetitionRow;
-      const student = parser(cells, rowIndex);
-      if (student) {
-        students.push(student);
+  const parseRowsFromRegex = (regex: RegExp) => {
+    let match;
+    let index = 0;
+    let skipped = 0;
+    while ((match = regex.exec(html)) !== null) {
+      const trHtml = match[1];
+      const cells = extractCells(trHtml);
+      if (cells.length >= 5) {
+        let student: ParsedStudent | null = null;
+        if (cells.length >= 15) {
+          student = type === 'contest' ? parseContestRow(cells, index) : parseCompetitionRow(cells, index);
+        } else {
+          student = parseEnrolledRow(cells, index);
+        }
+        if (student) {
+          students.push(student);
+        } else {
+          skipped++;
+        }
       } else {
-        skippedRows++;
+        skipped++;
       }
-    } else {
-      skippedRows++;
+      index++;
     }
-    rowIndex++;
+    return { count: index, skipped };
+  };
+
+  // Try matching data-unique-code rows first
+  let rowRegex = /<tr\s+data-unique-code="[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
+  let { count: rowCount, skipped: skippedRows } = parseRowsFromRegex(rowRegex);
+
+  // If no students found with data-unique-code, fallback to any tr tags
+  if (students.length === 0) {
+    rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    const res = parseRowsFromRegex(rowRegex);
+    rowCount = res.count;
+    skippedRows = res.skipped;
   }
 
-  if (students.length === 0 && rowIndex === 0) {
+  if (students.length === 0 && rowCount === 0) {
     warnings.push('Таблица с данными не найдена на странице.');
   } else if (skippedRows > 0 && students.length === 0) {
     warnings.push('Не удалось распознать ни одной строки. Возможно, изменилась структура HTML.');

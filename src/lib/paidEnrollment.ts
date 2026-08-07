@@ -1,4 +1,5 @@
 import { Competition, Student } from '../types';
+import { competitions } from '../competitions';
 
 export type EnrollmentItem = {
   student: Student;
@@ -46,6 +47,7 @@ export function compareApplicants(a: Student, b: Student): number {
 /**
  * Calculates enrollment allocation across the 6 paid directions.
  * Logic:
+ * - Applicants enrolled on Budget (listed in budget enrolled lists) are excluded from Paid lists.
  * - Each direction has a sorted list of applicants (by 5-tier points criteria).
  * - A student can apply to multiple directions with priorities (1, 2, 3...).
  * - If a student passes (fits within seats) in a higher-priority direction P,
@@ -61,15 +63,49 @@ export function computePaidEnrollmentAllocation(
     paidOnly?: boolean;
     contractOnly?: boolean;
     originalOnly?: boolean;
+    excludeBudgetEnrolled?: boolean;
   }
 ): Record<string, CompetitionEnrollmentResult> {
-  const { paidOnly = false, contractOnly = false, originalOnly = false } = options || {};
+  const {
+    paidOnly = false,
+    contractOnly = false,
+    originalOnly = false,
+    excludeBudgetEnrolled = true,
+  } = options || {};
+
+  const normalizeCode = (c: string) => c.replace(/\D/g, '') || c.trim();
+
+  // Find set of all uniqueCodes in budget enrolled lists
+  const budgetEnrolledCodes = new Set<string>();
+  if (excludeBudgetEnrolled) {
+    competitions.forEach((comp) => {
+      if (comp.basis === 'Бюджет') {
+        const bStudents = allCompStudents[comp.id] || [];
+        bStudents.forEach((s) => {
+          const code = s.uniqueCode || s.id;
+          if (code && code !== '-') {
+            budgetEnrolledCodes.add(code);
+            const norm = normalizeCode(code);
+            if (norm) budgetEnrolledCodes.add(norm);
+          }
+        });
+      }
+    });
+  }
 
   // Step 1: Prepare sorted lists for each competition
   const initialLists: Record<string, Array<{ student: Student; comp: Competition; rawRank: number }>> = {};
 
   paidCompetitions.forEach((comp) => {
     let rawList = allCompStudents[comp.id] ? [...allCompStudents[comp.id]] : [];
+
+    if (excludeBudgetEnrolled && budgetEnrolledCodes.size > 0) {
+      rawList = rawList.filter((s) => {
+        const code = s.uniqueCode || s.id;
+        if (!code) return true;
+        return !budgetEnrolledCodes.has(code) && !budgetEnrolledCodes.has(normalizeCode(code));
+      });
+    }
 
     if (paidOnly) {
       rawList = rawList.filter((s) => s.semesterPayment && s.semesterPayment !== 'Нет');

@@ -80,58 +80,96 @@ $students = [];
 $rowRegex = '/<tr\s+data-unique-code="([^"]*)"[^>]*>([\s\S]*?)<\/tr>/i';
 preg_match_all($rowRegex, $html, $rows, PREG_SET_ORDER);
 
-foreach ($rows as $i => $row) {
-    $uniqueCode = trim($row[1]);
-    if ($uniqueCode === '' || $uniqueCode === '-') continue;
+if (empty($rows)) {
+    $rowRegex = '/<tr[^>]*>([\s\S]*?)<\/tr>/i';
+    preg_match_all($rowRegex, $html, $rows, PREG_SET_ORDER);
+}
 
+foreach ($rows as $i => $row) {
+    $rowHtml = isset($row[2]) ? $row[2] : $row[1];
+    
     // Extract cells
     $cells = [];
     $cellRegex = '/<td[^>]*>([\s\S]*?)<\/td>/i';
-    preg_match_all($cellRegex, $row[2], $cellMatches, PREG_SET_ORDER);
+    preg_match_all($cellRegex, $rowHtml, $cellMatches, PREG_SET_ORDER);
     foreach ($cellMatches as $cm) {
         $cells[] = trim(strip_tags($cm[1]));
     }
 
-    if ($type === 'competition') {
-        if (count($cells) < 18) continue;
+    $uniqueCode = '';
+    if (isset($row[1]) && !empty($row[1]) && $row[1] !== '-' && !strpos($row[1], 'госуслуг')) {
+        $uniqueCode = trim($row[1]);
+    }
+    if (empty($uniqueCode)) {
+        foreach ($cells as $c) {
+            $cClean = trim($c);
+            if (strlen($cClean) >= 5 && preg_match('/\d/', $cClean) && strpos($cClean, 'госуслуг') === false && strpos($cClean, 'код') === false && strpos($cClean, 'Сумма') === false) {
+                $uniqueCode = $cClean;
+                break;
+            }
+        }
+    }
+    if (empty($uniqueCode) || $uniqueCode === '-') continue;
+
+    if (count($cells) >= 15) {
+        if ($type === 'competition') {
+            $students[] = [
+                'id'                    => "student-{$i}",
+                'uniqueCode'            => $uniqueCode,
+                'totalPoints'           => (int)($cells[2] ?? 0),
+                'examPoints'            => (int)($cells[3] ?? 0),
+                'subjects'              => [(int)($cells[4] ?? 0), (int)($cells[5] ?? 0), (int)($cells[6] ?? 0)],
+                'achievementPoints'     => (int)($cells[7] ?? 0),
+                'hasOriginal'           => isset($cells[8]) && strtolower(trim($cells[8])) === 'да',
+                'priority'              => (int)($cells[9] ?? 1),
+                'mainHigherPriority'    => $cells[10] ?? '-',
+                'higherPassingPriority' => $cells[11] ?? '1',
+                'preemptiveRight1'      => $cells[12] ?? 'Нет',
+                'preemptiveRight2'      => $cells[13] ?? 'Нет',
+                'idAtEquality'          => $cells[14] ?? 'Нет',
+                'withoutExams'          => $cells[15] ?? 'Нет',
+                'basisBVI'              => $cells[16] ?? '-',
+                'status'                => $cells[17] ?? 'Зачислен',
+            ];
+        } else {
+            $students[] = [
+                'id'                    => "student-{$i}",
+                'uniqueCode'            => $uniqueCode,
+                'totalPoints'           => (int)($cells[2] ?? 0),
+                'examPoints'            => (int)($cells[3] ?? 0),
+                'subjects'              => [(int)($cells[4] ?? 0), (int)($cells[5] ?? 0), (int)($cells[6] ?? 0)],
+                'achievementPoints'     => (int)($cells[7] ?? 0),
+                'hasOriginal'           => isset($cells[8]) && strtolower(trim($cells[8])) === 'да',
+                'semesterPayment'       => $cells[9] ?? 'Нет',
+                'priority'              => (int)($cells[10] ?? 1),
+                'mainHigherPriority'    => '-',
+                'higherPassingPriority' => '1',
+                'preemptiveRight1'      => $cells[11] ?? 'Нет',
+                'preemptiveRight2'      => $cells[12] ?? 'Нет',
+                'idAtEquality'          => $cells[13] ?? 'Нет',
+                'withoutExams'          => $cells[14] ?? 'Нет',
+                'basisBVI'              => $cells[15] ?? '-',
+                'status'                => $cells[16] ?? 'Зачислен',
+            ];
+        }
+    } else if (count($cells) >= 5) {
         $students[] = [
             'id'                    => "student-{$i}",
             'uniqueCode'            => $uniqueCode,
-            'totalPoints'           => (int)$cells[2],
-            'examPoints'            => (int)$cells[3],
-            'subjects'              => [(int)$cells[4], (int)$cells[5], (int)$cells[6]],
-            'achievementPoints'     => (int)$cells[7],
-            'hasOriginal'           => strtolower(trim($cells[8])) === 'да',
-            'priority'              => (int)$cells[9],
-            'mainHigherPriority'    => $cells[10] ?: '-',
-            'higherPassingPriority' => $cells[11] ?: '-',
-            'preemptiveRight1'      => $cells[12] ?: 'Нет',
-            'preemptiveRight2'      => $cells[13] ?: 'Нет',
-            'idAtEquality'          => $cells[14] ?: 'Нет',
-            'withoutExams'          => $cells[15] ?: 'Нет',
-            'basisBVI'              => $cells[16] ?: '-',
-            'status'                => $cells[17] ?? '',
-        ];
-    } else {
-        if (count($cells) < 17) continue;
-        $students[] = [
-            'id'                    => "student-{$i}",
-            'uniqueCode'            => $uniqueCode,
-            'totalPoints'           => (int)$cells[2],
-            'examPoints'            => (int)$cells[3],
-            'subjects'              => [(int)$cells[4], (int)$cells[5], (int)$cells[6]],
-            'achievementPoints'     => (int)$cells[7],
-            'hasOriginal'           => strtolower(trim($cells[8])) === 'да',
-            'semesterPayment'       => $cells[9] ?: 'Нет',
-            'priority'              => (int)$cells[10],
-            'mainHigherPriority'    => '-',
-            'higherPassingPriority' => '-',
-            'preemptiveRight1'      => $cells[11] ?: 'Нет',
-            'preemptiveRight2'      => $cells[12] ?: 'Нет',
-            'idAtEquality'          => $cells[13] ?: 'Нет',
-            'withoutExams'          => $cells[14] ?: 'Нет',
-            'basisBVI'              => $cells[15] ?: '-',
-            'status'                => $cells[16] ?? '',
+            'totalPoints'           => (int)($cells[2] ?? 0),
+            'examPoints'            => (int)($cells[3] ?? 0),
+            'subjects'              => [0, 0, 0],
+            'achievementPoints'     => (int)($cells[4] ?? 0),
+            'hasOriginal'           => true,
+            'priority'              => 1,
+            'mainHigherPriority'    => '1',
+            'higherPassingPriority' => '1',
+            'preemptiveRight1'      => 'Нет',
+            'preemptiveRight2'      => 'Нет',
+            'idAtEquality'          => 'Нет',
+            'withoutExams'          => $cells[5] ?? 'Нет',
+            'basisBVI'              => $cells[5] ?? '-',
+            'status'                => 'Зачислен',
         ];
     }
 }

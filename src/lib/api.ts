@@ -10,8 +10,10 @@ export type CompetitionDataMap = Record<string, CompetitionFetchResult>;
 
 export function getCompetitionPath(url: string) {
   const [, path] = url.split('pk.rgsu.net/');
-  const [type, id] = (path || 'competition/').split('/');
-  return { type: type || 'competition', id: id || '' };
+  const parts = (path || 'competition/').split('/');
+  const type = parts[0] || 'competition';
+  const id = parts.slice(1).join('/') || '';
+  return { type, id };
 }
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';

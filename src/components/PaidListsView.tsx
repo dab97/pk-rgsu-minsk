@@ -58,11 +58,29 @@ export function PaidListsView({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
 
+  const budgetEnrolledCount = useMemo(() => {
+    const codes = new Set<string>();
+    competitions.forEach((c) => {
+      if (c.basis === 'Бюджет') {
+        const bStudents = allCompStudents[c.id] || [];
+        bStudents.forEach((s) => {
+          const code = s.uniqueCode || s.id;
+          if (code && code !== '-') {
+            const norm = code.replace(/\D/g, '') || code.trim();
+            codes.add(norm);
+          }
+        });
+      }
+    });
+    return codes.size;
+  }, [allCompStudents]);
+
   // Calculate allocation across all 6 paid directions taking into account priorities
   const allocationResults = useMemo(() => {
     return computePaidEnrollmentAllocation(paidCompetitions, allCompStudents, {
       paidOnly: hasPaymentOnly,
       contractOnly: hasContractOnly,
+      excludeBudgetEnrolled: true,
     });
   }, [paidCompetitions, allCompStudents, hasPaymentOnly, hasContractOnly]);
 
@@ -154,6 +172,15 @@ export function PaidListsView({
                 <Layers01Icon className="w-3 h-3 text-slate-400" />
                 6 направлений (Платное)
               </span>
+              {budgetEnrolledCount > 0 && (
+                <>
+                  <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">•</span>
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200/70 dark:border-emerald-800/70 px-2.5 py-0.5 rounded-md">
+                    <UserCheck01Icon className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    Зачислены на бюджет: {budgetEnrolledCount} (исключены из платного)
+                  </span>
+                </>
+              )}
             </div>
 
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight leading-snug">
@@ -371,9 +398,9 @@ export function PaidListsView({
                   {isFilterOpen && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setIsFilterOpen(false)} />
-                      <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-3 z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-2.5">
-                        <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800 px-1">
-                          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Фильтры списка</span>
+                      <div className="absolute right-0 top-full mt-2 w-80 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between pb-2 mb-0.5 border-b border-slate-100 dark:border-slate-800 px-2 pt-1">
+                          <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Фильтры списка</span>
                           {activeFiltersCount > 0 && (
                             <button
                               type="button"
@@ -382,7 +409,7 @@ export function PaidListsView({
                                 setHasContractOnly(false);
                                 setHasPaymentOnly(false);
                               }}
-                              className="text-xs font-medium text-amber-600 hover:underline cursor-pointer"
+                              className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
                             >
                               Сбросить
                             </button>
@@ -390,36 +417,51 @@ export function PaidListsView({
                         </div>
 
                         {/* Option 1 */}
-                        <label className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors">
+                        <label className={cn(
+                          "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all select-none",
+                          passingOnly
+                            ? "bg-amber-50/80 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 hover:bg-amber-100/70 dark:hover:bg-amber-900/50"
+                            : "hover:bg-slate-100/80 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-200"
+                        )}>
                           <Checkbox
                             id="paid-passing-only"
                             checked={passingOnly}
                             onCheckedChange={(checked) => setPassingOnly(!!checked)}
-                            className="border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600 data-[state=checked]:text-white"
+                            className="w-4 h-4 rounded-md border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white shrink-0"
                           />
-                          <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">Только проходящие</span>
+                          <span className="text-sm font-medium leading-snug">Только проходящие</span>
                         </label>
 
                         {/* Option 2: Contract */}
-                        <label className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors">
+                        <label className={cn(
+                          "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all select-none",
+                          hasContractOnly
+                            ? "bg-amber-50/80 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 hover:bg-amber-100/70 dark:hover:bg-amber-900/50"
+                            : "hover:bg-slate-100/80 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-200"
+                        )}>
                           <Checkbox
                             id="paid-contract-only"
                             checked={hasContractOnly}
                             onCheckedChange={(checked) => setHasContractOnly(!!checked)}
-                            className="border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600 data-[state=checked]:text-white"
+                            className="w-4 h-4 rounded-md border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white shrink-0"
                           />
-                          <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">Заключен договор</span>
+                          <span className="text-sm font-medium leading-snug">Заключен договор</span>
                         </label>
 
                         {/* Option 3: Payment */}
-                        <label className="flex items-center gap-2.5 px-2 py-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors">
+                        <label className={cn(
+                          "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all select-none",
+                          hasPaymentOnly
+                            ? "bg-amber-50/80 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 hover:bg-amber-100/70 dark:hover:bg-amber-900/50"
+                            : "hover:bg-slate-100/80 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-200"
+                        )}>
                           <Checkbox
                             id="paid-payment-only"
                             checked={hasPaymentOnly}
                             onCheckedChange={(checked) => setHasPaymentOnly(!!checked)}
-                            className="border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-600 data-[state=checked]:border-amber-600 data-[state=checked]:text-white"
+                            className="w-4 h-4 rounded-md border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white shrink-0"
                           />
-                          <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">Только с оплатой</span>
+                          <span className="text-sm font-medium leading-snug">Только с оплатой</span>
                         </label>
                       </div>
                     </>

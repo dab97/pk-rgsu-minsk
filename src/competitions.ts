@@ -20,7 +20,7 @@ export const competitions: Competition[] = [
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
     seats: 9,
-    url: 'https://pk.rgsu.net/competition/832a62dc-f07a-11f0-b35d-f4034344acdb',
+    url: 'https://pk.rgsu.net/contest/832a62dc-f07a-11f0-b35d-f4034344acdb/enrolled',
   },
   {
     id: 'psychology-parttime',
@@ -31,7 +31,7 @@ export const competitions: Competition[] = [
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
     seats: 5,
-    url: 'https://pk.rgsu.net/competition/cf01a63b-f07a-11f0-b35d-f4034344acdb',
+    url: 'https://pk.rgsu.net/contest/cf01a63b-f07a-11f0-b35d-f4034344acdb/enrolled',
   },
   {
     id: 'management-fulltime',
@@ -42,7 +42,7 @@ export const competitions: Competition[] = [
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
     seats: 19,
-    url: 'https://pk.rgsu.net/competition/3ebfdc93-f07b-11f0-b35d-f4034344acdb',
+    url: 'https://pk.rgsu.net/contest/3ebfdc93-f07b-11f0-b35d-f4034344acdb/enrolled',
   },
   {
     id: 'social-work-fulltime',
@@ -53,7 +53,7 @@ export const competitions: Competition[] = [
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
     seats: 9,
-    url: 'https://pk.rgsu.net/competition/b90f9726-f07b-11f0-b35d-f4034344acdb',
+    url: 'https://pk.rgsu.net/contest/b90f9726-f07b-11f0-b35d-f4034344acdb/enrolled',
   },
   {
     id: 'social-work-parttime',
@@ -64,7 +64,7 @@ export const competitions: Competition[] = [
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
     seats: 10,
-    url: 'https://pk.rgsu.net/competition/0d59f6cc-f07c-11f0-b35d-f4034344acdb',
+    url: 'https://pk.rgsu.net/contest/0d59f6cc-f07c-11f0-b35d-f4034344acdb/enrolled',
   },
   {
     id: 'law-fulltime',
@@ -75,7 +75,7 @@ export const competitions: Competition[] = [
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
     seats: 8,
-    url: 'https://pk.rgsu.net/competition/7023ede3-f07c-11f0-b35d-f4034344acdb',
+    url: 'https://pk.rgsu.net/contest/7023ede3-f07c-11f0-b35d-f4034344acdb/enrolled',
   },
   {
     id: 'psychology-fulltime-contract',

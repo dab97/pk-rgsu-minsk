@@ -35,7 +35,9 @@ export function useAllCompetitions(
       const updates: string[] = [];
       Object.entries(map).forEach(([compId, data]) => {
         studentsMap[compId] = data.students;
-        fetchedIdsRef.current.add(compId);
+        if (data.students && data.students.length > 0) {
+          fetchedIdsRef.current.add(compId);
+        }
         if (data.updatedAt) updates.push(data.updatedAt);
         if (data.seats > 0) seatsMap[compId] = data.seats;
       });

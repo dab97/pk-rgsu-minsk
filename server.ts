@@ -30,7 +30,7 @@ function evictExpired(): void {
 function getCached(key: string): CacheEntry | null {
   const entry = cache.get(key);
   if (!entry) return null;
-  if (Date.now() - entry.fetchedAt > CACHE_TTL_MS) {
+  if (Date.now() - entry.fetchedAt > CACHE_TTL_MS || entry.data.length === 0) {
     cache.delete(key);
     return null;
   }
@@ -62,7 +62,9 @@ async function fetchAndParse(type: string, id: string): Promise<CacheEntry> {
   const result: ParseResult = parseRgsuHtml(html, type);
 
   const entry: CacheEntry = { data: result.students, updatedAt: result.updatedAt, seats: result.seats, warnings: result.warnings, fetchedAt: Date.now() };
-  cache.set(`${type}:${id}`, entry);
+  if (result.students.length > 0) {
+    cache.set(`${type}:${id}`, entry);
+  }
   return entry;
 }
 
@@ -71,20 +73,28 @@ async function startServer() {
   const PORT = Number(process.env.PORT) || 3000;
 
   // API route for fetching competition data
-  app.get("/api/competition/:type/:id", async (req, res) => {
+  app.use(async (req, res, next) => {
+    if (req.method !== 'GET' || !req.path.startsWith('/api/competition/')) {
+      return next();
+    }
     try {
-      const { type, id } = req.params;
+      const subPath = req.path.replace(/^\/api\/competition\//, '');
+      const parts = subPath.split('/');
+      const type = parts[0] || '';
+      const id = parts.slice(1).join('/') || '';
+
       if (type !== 'competition' && type !== 'contest') {
         res.status(400).json({ success: false, error: 'Invalid competition type' });
         return;
       }
 
       const cacheKey = `${type}:${id}`;
+      console.log(`[API Request] key=${cacheKey}`);
 
       // 1. Отдаём из кэша если свежий
       const cached = getCached(cacheKey);
       if (cached) {
-        console.log(`[cache HIT] ${cacheKey}`);
+        console.log(`[cache HIT] ${cacheKey} (students: ${cached.data.length})`);
         res.setHeader('X-Cache', 'HIT');
         res.json({ success: true, data: cached.data, updatedAt: cached.updatedAt, seats: cached.seats, warnings: cached.warnings });
         return;
@@ -106,6 +116,7 @@ async function startServer() {
       inFlight.set(cacheKey, promise);
 
       const entry = await promise;
+      console.log(`[API Done] ${cacheKey} -> ${entry.data.length} students parsed`);
       res.json({ success: true, data: entry.data, updatedAt: entry.updatedAt, seats: entry.seats, warnings: entry.warnings });
 
     } catch (error: any) {

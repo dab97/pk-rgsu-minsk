@@ -90,6 +90,46 @@ function parseContestRow(cells: string[], index: number): ParsedStudent | null {
   } catch { return null; }
 }
 
+function parseEnrolledRow(cells: string[], index: number): ParsedStudent | null {
+  try {
+    const codeCell = cells.find((c) => {
+      const str = parseStr(c);
+      return (
+        str.length >= 5 &&
+        /\d/.test(str) &&
+        !str.includes('госуслуг') &&
+        !str.includes('код') &&
+        !str.includes('№') &&
+        !str.includes('Сумма') &&
+        !str.includes('баллов')
+      );
+    });
+    if (!codeCell) return null;
+    const uniqueCode = parseStr(codeCell);
+
+    return {
+      id: `student-${index}`,
+      uniqueCode,
+      totalPoints: parseNum(cells[2] || '0'),
+      examPoints: parseNum(cells[3] || '0'),
+      subjects: [0, 0, 0],
+      achievementPoints: parseNum(cells[4] || '0'),
+      hasOriginal: true,
+      priority: 1,
+      mainHigherPriority: '1',
+      higherPassingPriority: '1',
+      preemptiveRight1: 'Нет',
+      preemptiveRight2: 'Нет',
+      idAtEquality: 'Нет',
+      withoutExams: cells[5] ? parseStr(cells[5]) : 'Нет',
+      basisBVI: cells[5] ? parseStr(cells[5]) : '-',
+      status: 'Зачислен',
+    };
+  } catch {
+    return null;
+  }
+}
+
 function parseRgsuHtml(html: string, type: string): ParseResult {
   const students: ParsedStudent[] = [];
   const warnings: string[] = [];
@@ -107,18 +147,45 @@ function parseRgsuHtml(html: string, type: string): ParseResult {
   }
   const updMatch = html.match(/Сведения\s+обновлены:\s*([^<]+)/i);
   const updatedAt = updMatch ? updMatch[1].trim() : null;
-  const rowRegex = /<tr\s+data-unique-code="[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
-  let rowMatch; let rowIndex = 0; let skippedRows = 0;
-  while ((rowMatch = rowRegex.exec(html)) !== null) {
-    const cells = extractCells(rowMatch[1]);
-    if (cells.length >= 10) {
-      const parser = type === 'contest' ? parseContestRow : parseCompetitionRow;
-      const student = parser(cells, rowIndex);
-      if (student) students.push(student); else skippedRows++;
-    } else { skippedRows++; }
-    rowIndex++;
+
+  const parseRowsFromRegex = (regex: RegExp) => {
+    let match;
+    let index = 0;
+    let skipped = 0;
+    while ((match = regex.exec(html)) !== null) {
+      const trHtml = match[1];
+      const cells = extractCells(trHtml);
+      if (cells.length >= 5) {
+        let student: ParsedStudent | null = null;
+        if (cells.length >= 15) {
+          student = type === 'contest' ? parseContestRow(cells, index) : parseCompetitionRow(cells, index);
+        } else {
+          student = parseEnrolledRow(cells, index);
+        }
+        if (student) {
+          students.push(student);
+        } else {
+          skipped++;
+        }
+      } else {
+        skipped++;
+      }
+      index++;
+    }
+    return { count: index, skipped };
+  };
+
+  let rowRegex = /<tr\s+data-unique-code="[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
+  let { count: rowCount, skipped: skippedRows } = parseRowsFromRegex(rowRegex);
+
+  if (students.length === 0) {
+    rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    const res = parseRowsFromRegex(rowRegex);
+    rowCount = res.count;
+    skippedRows = res.skipped;
   }
-  if (students.length === 0 && rowIndex === 0) warnings.push('Таблица с данными не найдена на странице.');
+
+  if (students.length === 0 && rowCount === 0) warnings.push('Таблица с данными не найдена на странице.');
   else if (skippedRows > 0 && students.length === 0) warnings.push('Не удалось распознать ни одной строки.');
   else if (skippedRows > 0) warnings.push(`Пропущено ${skippedRows} строк.`);
   if (students.length === 0 && seats === 0) warnings.push('Ни студенты, ни места не найдены.');
@@ -166,8 +233,18 @@ async function fetchHtml(url: string): Promise<string> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const { type, id } = req.query;
-  if (typeof type !== 'string' || typeof id !== 'string') return res.status(400).json({ success: false, error: 'Invalid params' });
+  let type = '';
+  let id = '';
+
+  if (Array.isArray(req.query.path)) {
+    type = req.query.path[0] || '';
+    id = req.query.path.slice(1).join('/') || '';
+  } else {
+    type = typeof req.query.type === 'string' ? req.query.type : '';
+    id = typeof req.query.id === 'string' ? req.query.id : '';
+  }
+
+  if (!type || !id) return res.status(400).json({ success: false, error: 'Invalid params' });
   if (type !== 'competition' && type !== 'contest') return res.status(400).json({ success: false, error: 'Invalid type' });
 
   const cacheKey = `${type}:${id}`;
