@@ -1,19 +1,32 @@
 import React from 'react';
 import { Competition, BasisType } from '../types';
 import { AccentTheme } from '../constants/theme';
-import { Location01Icon, BookOpen01Icon, GraduationScrollIcon, UserCheck01Icon, Layers01Icon, Tag01Icon, Clock01Icon } from 'hugeicons-react';
+import { Location01Icon, BookOpen01Icon, GraduationScrollIcon, UserCheck01Icon, Layers01Icon, Tag01Icon, Clock01Icon, DatabaseIcon, ShieldKeyIcon } from 'hugeicons-react';
 
 interface CompetitionHeroBannerProps {
   selectedComp: Competition;
   activeBasis: BasisType;
   accent: AccentTheme;
   updatedAt?: string | null;
+  dataSource?: 'live' | 'archive' | null;
+  archivedAt?: string | null;
 }
 
-export function CompetitionHeroBanner({ selectedComp, activeBasis, updatedAt }: CompetitionHeroBannerProps) {
+function formatArchiveDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return iso;
+  }
+}
+
+export function CompetitionHeroBanner({ selectedComp, activeBasis, updatedAt, dataSource, archivedAt }: CompetitionHeroBannerProps) {
   const compCode = selectedComp.title.split(' — ')[0] || '';
   const compTitleOnly = selectedComp.title.split(' — ')[1] || selectedComp.title;
   const isBudget = activeBasis === 'Бюджет';
+  const isArchive = dataSource === 'archive';
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl sm:rounded-3xl p-5 sm:p-8 relative overflow-hidden mb-6">
@@ -57,7 +70,19 @@ export function CompetitionHeroBanner({ selectedComp, activeBasis, updatedAt }: 
           {updatedAt ? (
             <p className="inline-flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 mt-3">
               <Clock01Icon className="w-3.5 h-3.5 text-slate-400" />
-              Сведения обновлены: {updatedAt}
+              <span>Сведения обновлены: {updatedAt}</span>
+              <span className="text-slate-300 dark:text-slate-700">•</span>
+              {isArchive ? (
+                <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-300">
+                  <ShieldKeyIcon className="w-3.5 h-3.5" />
+                  данные из архива{archivedAt ? ` (${formatArchiveDate(archivedAt)})` : ''}
+                </span>
+              ) : dataSource === 'live' ? (
+                <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
+                  <DatabaseIcon className="w-3.5 h-3.5" />
+                  актуальные данные с pk.rgsu.net
+                </span>
+              ) : null}
             </p>
           ) : null}
 

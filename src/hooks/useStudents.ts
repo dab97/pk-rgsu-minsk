@@ -42,7 +42,7 @@ export function useStudents(
     if (consentOnly) {
       result = activeBasis === 'Бюджет'
         ? result.filter(s => s.higherPassingPriority !== '-' && s.higherPassingPriority !== 'Нет')
-        : result.filter(s => s.hasOriginal);
+        : result.filter(s => s.hasContract || s.hasOriginal);
     }
 
     if (searchQuery.trim()) {

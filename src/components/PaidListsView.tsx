@@ -514,7 +514,7 @@ export function PaidListsView({
                       const isPriority1 = item.student.priority === 1;
                       const hasPayment =
                         item.student.semesterPayment && item.student.semesterPayment !== 'Нет';
-                      const hasContract = item.student.hasContract ?? (hasPayment || false);
+                      const hasContract = item.student.hasContract ?? false;
 
                       return (
                         <TableRow
@@ -541,18 +541,9 @@ export function PaidListsView({
                             {item.student.uniqueCode}
                           </TableCell>
                           <TableCell className="text-center py-2 px-1.5">
-                            <div className="flex justify-center">
-                              <span
-                                className={cn(
-                                  "w-6 h-6 rounded-full inline-flex items-center justify-center text-xs font-bold tabular-nums transition-all",
-                                  isPriority1
-                                    ? "bg-amber-500 text-white dark:bg-amber-600 shadow-xs"
-                                    : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                                )}
-                              >
-                                {item.student.priority}
-                              </span>
-                            </div>
+                            <span className="text-sm font-bold tabular-nums">
+                              {item.student.priority}
+                            </span>
                           </TableCell>
                           <TableCell className="text-center tabular-nums font-bold text-amber-700 dark:text-amber-300 text-sm py-2 px-2">
                             {item.student.totalPoints}
@@ -574,29 +565,41 @@ export function PaidListsView({
                           </TableCell>
                           <TableCell className="text-center py-2 px-1.5">
                             {item.student.hasOriginal ? (
-                              <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800">
-                                Оригинал
-                              </Badge>
+                              <>
+                                <CheckmarkCircle01Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 inline print:hidden" />
+                                <span className="hidden print:inline text-emerald-700 font-medium">Да</span>
+                              </>
                             ) : (
-                              <span className="text-slate-400 text-[11px]">Копия</span>
+                              <>
+                                <CancelCircleIcon className="w-5 h-5 text-slate-300 dark:text-slate-600 inline print:hidden" />
+                                <span className="hidden print:inline text-slate-500">Нет</span>
+                              </>
                             )}
                           </TableCell>
                           <TableCell className="text-center py-2 px-1.5">
                             {hasContract ? (
-                              <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 font-medium">
-                                Заключен
-                              </Badge>
+                              <>
+                                <CheckmarkCircle01Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 inline print:hidden" />
+                                <span className="hidden print:inline text-emerald-700 font-medium">Да</span>
+                              </>
                             ) : (
-                              <span className="text-slate-400 text-[11px]">Нет</span>
+                              <>
+                                <CancelCircleIcon className="w-5 h-5 text-slate-300 dark:text-slate-600 inline print:hidden" />
+                                <span className="hidden print:inline text-slate-500">Нет</span>
+                              </>
                             )}
                           </TableCell>
                           <TableCell className="text-center py-2 px-1.5">
                             {hasPayment ? (
-                              <Badge variant="outline" className="bg-emerald-600 text-white border-0 text-[10px] px-2 py-0.5 font-medium">
-                                {item.student.semesterPayment}
-                              </Badge>
+                              <>
+                                <CheckmarkCircle01Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 inline print:hidden" />
+                                <span className="hidden print:inline text-emerald-700 font-medium">Да</span>
+                              </>
                             ) : (
-                              <span className="text-slate-400 text-[11px]">Не оплачено</span>
+                              <>
+                                <CancelCircleIcon className="w-5 h-5 text-slate-300 dark:text-slate-600 inline print:hidden" />
+                                <span className="hidden print:inline text-slate-500">Нет</span>
+                              </>
                             )}
                           </TableCell>
                           <TableCell className="text-left py-2 px-2">

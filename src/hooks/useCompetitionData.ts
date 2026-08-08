@@ -11,6 +11,8 @@ type UseCompetitionDataResult = {
   fetchError: string | null;
   seatsByComp: Record<string, number>;
   setSeatsByComp: React.Dispatch<React.SetStateAction<Record<string, number>>>;
+  dataSource: 'live' | 'archive' | null;
+  archivedAt: string | null;
 };
 
 export function useCompetitionData(
@@ -29,6 +31,8 @@ export function useCompetitionData(
       return {};
     }
   });
+  const [dataSource, setDataSource] = useState<'live' | 'archive' | null>(null);
+  const [archivedAt, setArchivedAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (Object.keys(seatsByComp).length > 0) {
@@ -59,6 +63,8 @@ export function useCompetitionData(
           if (data.students.length > 0) {
             setFetchedStudents(data.students);
             setUpdatedAt(data.updatedAt ?? null);
+            setDataSource(data.source);
+            setArchivedAt(data.archivedAt ?? null);
             if (data.seats > 0) {
               setSeatsByComp((prev) => (prev[comp.id] === data.seats ? prev : { ...prev, [comp.id]: data.seats }));
             }
@@ -72,6 +78,8 @@ export function useCompetitionData(
         setFetchError('Сервер РГСУ не ответил или заблокировал запрос. Попробуйте обновить страницу позже.');
         setFetchedStudents([]);
         setUpdatedAt(null);
+        setDataSource(null);
+        setArchivedAt(null);
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -81,5 +89,5 @@ export function useCompetitionData(
     return () => { cancelled = true; };
   }, [selectedCompId, activeBasis]);
 
-  return { students: fetchedStudents, updatedAt, setUpdatedAt, isLoading, fetchError, seatsByComp, setSeatsByComp };
+  return { students: fetchedStudents, updatedAt, setUpdatedAt, isLoading, fetchError, seatsByComp, setSeatsByComp, dataSource, archivedAt };
 }

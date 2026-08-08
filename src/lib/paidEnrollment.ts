@@ -111,7 +111,7 @@ export function computePaidEnrollmentAllocation(
       rawList = rawList.filter((s) => s.semesterPayment && s.semesterPayment !== 'Нет');
     }
     if (contractOnly) {
-      rawList = rawList.filter((s) => s.hasContract);
+      rawList = rawList.filter((s) => s.hasContract || s.hasOriginal);
     }
     if (originalOnly) {
       rawList = rawList.filter((s) => s.hasOriginal);

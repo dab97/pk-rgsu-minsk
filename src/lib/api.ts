@@ -1,9 +1,13 @@
 import { Student, Competition } from '../data';
 
+export type DataSource = 'live' | 'archive';
+
 export type CompetitionFetchResult = {
   students: Student[];
   updatedAt: string | null;
   seats: number;
+  source: DataSource;
+  archivedAt?: string;
 };
 
 export type CompetitionDataMap = Record<string, CompetitionFetchResult>;
@@ -32,6 +36,8 @@ async function fetchCompetitionData(type: string, id: string): Promise<Competiti
     students: result.data as Student[],
     updatedAt: result.updatedAt ?? null,
     seats: typeof result.seats === 'number' ? result.seats : 0,
+    source: (result.source === 'archive' ? 'archive' : 'live') as DataSource,
+    archivedAt: typeof result.archivedAt === 'string' ? result.archivedAt : undefined,
   };
 }
 

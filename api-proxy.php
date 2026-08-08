@@ -1,7 +1,16 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, OPTIONS');
+// CORS: разрешаем только известные источники (настраивается через ALLOWED_ORIGINS)
+$allowedOrigins = array_filter(array_map('trim', explode(',', getenv('ALLOWED_ORIGINS') ?: 'https://pk-rgsu-minsk.vercel.app,http://localhost:3000,http://localhost:5173')));
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origin, $allowedOrigins, true)) {
+    header("Access-Control-Allow-Origin: $origin");
+    header('Vary: Origin');
+    header('Access-Control-Allow-Methods: GET, OPTIONS');
+    header('Access-Control-Max-Age: 1800');
+}
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: no-referrer');
 header('Cache-Control: public, max-age=180');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -9,23 +18,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    http_response_code(405);
+    echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+    exit;
+}
+
 $type = $_GET['type'] ?? '';
 $id   = $_GET['id']   ?? '';
 
-if (!in_array($type, ['competition', 'contest']) || empty($id)) {
+if (!in_array($type, ['competition', 'contest'], true) || empty($id)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Invalid params']);
     exit;
 }
 
+// Валидация id: только безопасные символы, без path traversal
+if (!preg_match('/^[A-Za-z0-9_\-]{1,256}$/', $id)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Invalid id']);
+    exit;
+}
+
 $url = "https://pk.rgsu.net/{$type}/{$id}";
+$maxBytes = 5 * 1024 * 1024; // 5 МБ
+$maxRedirects = 3;
 
 $ch = curl_init();
 curl_setopt_array($ch, [
     CURLOPT_URL            => $url,
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_TIMEOUT        => 30,
+    CURLOPT_CONNECTTIMEOUT => 10,
     CURLOPT_FOLLOWLOCATION => true,
+    CURLOPT_MAXREDIRS      => $maxRedirects,
+    CURLOPT_PROTOCOLS      => CURLPROTO_HTTPS,
+    CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTPS,
+    CURLOPT_SSL_VERIFYPEER => true,
+    CURLOPT_SSL_VERIFYHOST => 2,
     CURLOPT_ENCODING       => '',
     CURLOPT_HTTPHEADER     => [
         'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -37,19 +67,35 @@ curl_setopt_array($ch, [
 
 $html = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+$downloadSize = curl_getinfo($ch, CURLINFO_SIZE_DOWNLOAD);
 $errno    = curl_errno($ch);
 $err      = curl_error($ch);
 curl_close($ch);
 
+// Защита от SSRF через редирект: проверяем, что итоговый URL остался на pk.rgsu.net
+if ($effectiveUrl && !preg_match('#^https://pk\.rgsu\.net/#i', $effectiveUrl)) {
+    http_response_code(502);
+    echo json_encode(['success' => false, 'error' => 'Upstream redirected off-domain']);
+    exit;
+}
+
+// Защита от OOM: ограничиваем размер скачанного ответа
+if ($downloadSize > $maxBytes) {
+    http_response_code(502);
+    echo json_encode(['success' => false, 'error' => 'Upstream response too large']);
+    exit;
+}
+
 if ($errno || !$html) {
     http_response_code(502);
-    echo json_encode(['success' => false, 'error' => "Curl error: {$err}"]);
+    echo json_encode(['success' => false, 'error' => 'Upstream fetch failed']);
     exit;
 }
 
 if ($httpCode !== 200) {
     http_response_code(502);
-    echo json_encode(['success' => false, 'error' => "RGSU returned {$httpCode}"]);
+    echo json_encode(['success' => false, 'error' => 'Upstream returned non-200']);
     exit;
 }
 

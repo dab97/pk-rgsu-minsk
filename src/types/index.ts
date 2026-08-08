@@ -19,6 +19,7 @@ export type DirectionRow = {
   total?: number;
   points?: number;
   hasOriginal?: boolean;
+  hasContract?: boolean;
   isCurrent?: boolean;
   priority?: number;
   passingScore?: number | null;

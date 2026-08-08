@@ -51,7 +51,7 @@ export function useMyPosition(
       const seats = seatsByComp[comp.id] ?? comp.seats;
       const admitted = comp.basis === 'Бюджет'
         ? sorted.filter(s => s.higherPassingPriority !== '-' && s.higherPassingPriority !== 'Нет')
-        : sorted.filter(s => s.hasOriginal);
+        : sorted.filter(s => s.hasContract || s.hasOriginal);
       let passingScore: number | null = null;
       if (admitted.length >= seats && seats > 0) {
         passingScore = admitted[seats - 1].totalPoints;
@@ -69,6 +69,7 @@ export function useMyPosition(
         total: sorted.length,
         points: st.totalPoints,
         hasOriginal: st.hasOriginal,
+        hasContract: st.hasContract,
         isCurrent: comp.id === selectedComp.id,
         priority: st.priority,
         passingScore,

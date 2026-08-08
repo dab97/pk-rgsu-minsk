@@ -61,7 +61,7 @@ npm run test:watch    # Watch-режим (перезапуск при измен
 
 | Файл                            | Тестов | Что покрывает                                    |
 | ------------------------------- | ------ | ------------------------------------------------ |
-| `shared/parser.test.ts`         | 13     | Парсинг HTML,座位,updatedAt,edge cases           |
+| `shared/parser.test.ts`         | 18     | Парсинг HTML, seats, updatedAt, edge cases + валидация входа (SSRF) |
 | `src/hooks/useStudents.test.ts` | 8      | Сортировка, фильтрация, rankedStudents           |
 | `src/hooks/useStats.test.ts`    | 8      | Статистика, прогноз проходного, средний балл     |
 | `src/hooks/useMyPosition.test.ts`| 10     | Позиция студента, поиск по направлениям          |
@@ -155,3 +155,70 @@ vercel --prod
 ```
 
 Serverless-функция `api/competition/[type]/[id].ts` обрабатывает запросы к `pk.rgsu.net` с таймаутом до 60 секунд.
+
+## Резервный архив приказов
+
+Приказы о зачислении на бюджет — финальные документы, после публикации они не меняются, но теоретически могут быть удалены с `pk.rgsu.net`. Для подстраховки реализован локальный архив:
+
+### Скачивание архива
+
+```bash
+npm run archive:orders
+```
+
+Скрипт `scripts/fetch-orders.ts` обходит все бюджетные направления из `competitions.ts` (только с маркером `/enrolled`), парсит каждое через тот же `parseRgsuHtml`, что и runtime, и сохраняет в `public/orders/<competitionId>.json` + `manifest.json`. Лимит 5 МБ на ответ, таймаут 50 секунд.
+
+### Fallback в API
+
+При недоступности `pk.rgsu.net` (таймаут / 5xx / network error) сервер **сначала пытается отдать локальный архив**:
+
+- Express (`server.ts`) — читает напрямую из `public/orders/*.json`.
+- Vercel serverless (`api/competition/[type]/[id].ts`) — если FS недоступна, делает fetch к `/orders/<id>.json` своего же приложения.
+
+В обоих случаях:
+- HTTP-заголовок `X-Source: archive`, `X-Archive-Date: <iso>`.
+- JSON-поле `source: "archive"`, `archivedAt: "<iso>"`.
+- Добавляется warning: `«Данные из локального архива — сервер pk.rgsu.net временно недоступен»`.
+
+### Индикатор в UI
+
+В `CompetitionHeroBanner` отображается бейдж:
+- **`live`** — зелёный «Актуальные данные с pk.rgsu.net».
+- **`archive`** — янтарный «Данные из локального архива» + дата архивации.
+
+## Безопасность
+
+Проект прошёл аудит безопасности (см. `SECURITY_TASKS.md`). Применённые меры:
+
+### Серверная часть (Express + Vercel serverless)
+- **Helmet** — security headers: HSTS (1 год, `includeSubDomains`, `preload`), Referrer-Policy, X-Frame-Options, Permissions-Policy.
+- **CSP** — строгая Content-Security-Policy включается в production (`script-src 'self'`, `frame-ancestors 'none'`, `connect-src 'self'`).
+- **Security headers для Vercel** — `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, CSP, HSTS — заданы в `vercel.json` и применяются ко всем роутам.
+- **Rate limiting** — `express-rate-limit` на `/api/competition/*` (по умолчанию 60 req/min на IP, настраивается через `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX`).
+- **Валидация входа** — единая функция `buildSafeRgsuUrl(type, id)` в `shared/parser.ts`: проверка `type ∈ {competition, contest}`, regex `^[A-Za-z0-9_\-]{1,256}$` для `id`, проверка `hostname === 'pk.rgsu.net'` через `new URL()`. Защищает от SSRF и path-traversal.
+- **Лимит размера ответа** — `MAX_RESPONSE_BYTES` (5 МБ) с потоковым чтением через `Response.body.getReader()` + проверка `Content-Length` + `reader.cancel()` при превышении.
+- **LRU-кэш** — `lru-cache` с `max: 500`, `ttlAutopurge: true` (настраивается через `CACHE_MAX_ENTRIES`).
+- **Безопасные коды ошибок** — клиенту возвращаются категории (`Upstream timeout`, `Upstream response too large`, `Upstream fetch failed`), а не сырой `error.message`.
+- **Санитизация логов** — логируется только `kind` (TIMEOUT / TOO_LARGE / FETCH_FAILED) и `cacheKey`, без полного `error.message` (исключает утечку URL с id).
+
+### Парсер HTML
+- Все regex с `[\s\S]*?` (catastrophic backtracking) заменены на безопасный `indexOf`-парсинг тегов `<tr>` / `<td>`.
+- Seat-парсер автоматически определяет тип тега (`<div>`/`<span>`) вместо захардкоженного `</span>`.
+
+### api-proxy.php (резервный прокси)
+- `CURLOPT_PROTOCOLS=CURLPROTO_HTTPS`, `CURLOPT_REDIR_PROTOCOLS=CURLPROTO_HTTPS` — только HTTPS, защита от редиректа на file:// / gopher://.
+- `CURLOPT_MAXREDIRS=3`, `CURLOPT_SSL_VERIFYPEER/HOST=true`.
+- Проверка `CURLINFO_EFFECTIVE_URL` — итоговый URL должен остаться на `pk.rgsu.net` (защита от SSRF через редирект).
+- Валидация `id`: `^[A-Za-z0-9_\-]{1,256}$`.
+- Лимит скачанного ответа — 5 МБ (защита от OOM).
+- CORS — whitelist origin через env `ALLOWED_ORIGINS`.
+- Method-check: только GET (405 на остальные).
+
+### Зависимости
+- `@vercel/node` зафиксирован на `3.0.1` (downgrade с 5.x) для устранения high CVE в `undici` (CRLF injection, smuggling, WebSocket DoS), `js-yaml` (quadratic DoS), `minimatch` (ReDoS).
+- Оставшиеся moderate CVE (`ajv`, `esbuild`) — только в dev-зависимостях `@vercel/node`, на проде не выполняются.
+
+### XSS / инъекции
+- React автоматически экранирует текст — `dangerouslySetInnerHTML` не используется.
+- `eval`, `new Function`, `document.write`, `innerHTML` отсутствуют в клиентском коде.
+- Секреты не хранятся в репозитории (`.env*` в `.gitignore`).

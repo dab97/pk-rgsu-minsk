@@ -5,3 +5,6 @@ coverage/
 .DS_Store
 *.log
 .env*
+# Архивы приказов (генерируются через npm run archive:orders)
+public/orders/*.json
+!public/orders/manifest.json.example

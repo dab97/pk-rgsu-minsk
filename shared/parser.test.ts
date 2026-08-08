@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseRgsuHtml } from './parser';
+import { parseRgsuHtml, isValidId, isValidType, buildSafeRgsuUrl } from './parser';
 
 const competitionHtml = `
 <!DOCTYPE html>
@@ -79,7 +79,7 @@ const contestHtml = `
         <td><div class="table__text"> 100 </div></td>
         <td><div class="table__text"> 0 </div></td>
         <td><div class="table__text"> да </div></td>
-        <td><div class="table__text"> Да </div></td>
+        <td><div class="table__text"> Нет </div></td>
         <td class="color-blue"><div class="table__text"> 1 </div></td>
         <td><div class="table__text"> Нет </div></td>
         <td><div class="table__text"> Нет </div></td>
@@ -154,7 +154,8 @@ describe('parseRgsuHtml', () => {
       expect(result.students).toHaveLength(1);
       expect(result.students[0].uniqueCode).toBe('XYZ789');
       expect(result.students[0].totalPoints).toBe(250);
-      expect(result.students[0].semesterPayment).toBe('Да');
+      expect(result.students[0].hasContract).toBe(true);
+      expect(result.students[0].semesterPayment).toBe('Нет');
     });
 
     it('parses seats correctly', () => {
@@ -166,6 +167,40 @@ describe('parseRgsuHtml', () => {
       const result = parseRgsuHtml(contestHtml, 'contest');
       expect(result.students[0].mainHigherPriority).toBe('-');
       expect(result.students[0].higherPassingPriority).toBe('-');
+    });
+
+    it('parses contract (cells[8]) and payment (cells[9]) independently', () => {
+      // Реальный кейс: договор заключён, но оплаты нет (как у 1854067)
+      const html = `
+        <html><body>
+          <table><tbody>
+            <tr data-unique-code="1854067" data-number="14">
+              <td><div class="table__text">14</div></td>
+              <td><div class="table__text"> 1854067 </div></td>
+              <td><div class="table__text"> 250 </div></td>
+              <td><div class="table__text"> 250 </div></td>
+              <td><div class="table__text"> 64 </div></td>
+              <td><div class="table__text"> 88 </div></td>
+              <td><div class="table__text"> 98 </div></td>
+              <td><div class="table__text"> 0 </div></td>
+              <td><div class="table__text"> Да </div></td>
+              <td><div class="table__text"> Нет </div></td>
+              <td><div class="table__text"> 1 </div></td>
+              <td><div class="table__text"> Нет </div></td>
+              <td><div class="table__text"> Нет </div></td>
+              <td><div class="table__text"> Нет </div></td>
+              <td><div class="table__text"> Нет </div></td>
+              <td><div class="table__text"> - </div></td>
+              <td><div class="table__text"> Участвует в конкурсе </div></td>
+            </tr>
+          </tbody></table>
+        </body></html>
+      `;
+      const result = parseRgsuHtml(html, 'contest');
+      expect(result.students).toHaveLength(1);
+      expect(result.students[0].uniqueCode).toBe('1854067');
+      expect(result.students[0].hasContract).toBe(true);   // cells[8] === 'Да'
+      expect(result.students[0].semesterPayment).toBe('Нет'); // cells[9] === 'Нет'
     });
   });
 
@@ -264,4 +299,58 @@ describe('parseRgsuHtml', () => {
       expect(result.updatedAt).toBeNull();
     });
   });
+
+  describe('input validation', () => {
+    it('isValidId accepts safe ids', () => {
+      expect(isValidId('abc123')).toBe(true);
+      expect(isValidId('abc-123_xyz')).toBe(true);
+      expect(isValidId('a')).toBe(true);
+      expect(isValidId('A'.repeat(256))).toBe(true);
+    });
+
+    it('isValidId rejects dangerous inputs', () => {
+      expect(isValidId('')).toBe(false);
+      expect(isValidId('../admin')).toBe(false);
+      expect(isValidId('a/b')).toBe(false);
+      expect(isValidId('a%2Fb')).toBe(false);
+      expect(isValidId('a b')).toBe(false);
+      expect(isValidId('a@b')).toBe(false);
+      expect(isValidId('a?b=1')).toBe(false);
+      expect(isValidId('a#x')).toBe(false);
+      expect(isValidId('A'.repeat(257))).toBe(false);
+      expect(isValidId('..')).toBe(false);
+      expect(isValidId('foo.json')).toBe(false);
+    });
+
+    it('isValidId allows /enrolled suffix (budget enrolled pages)', () => {
+      expect(isValidId('3ebfdc93-f07b-11f0-b35d-f4034344acdb/enrolled')).toBe(true);
+      expect(isValidId('abc/enrolled')).toBe(true);
+      // Но не другой путь
+      expect(isValidId('abc/foo')).toBe(false);
+      expect(isValidId('abc/../admin')).toBe(false);
+      expect(isValidId('abc/enrolled/foo')).toBe(false);
+    });
+
+    it('isValidType accepts only competition or contest', () => {
+      expect(isValidType('competition')).toBe(true);
+      expect(isValidType('contest')).toBe(true);
+      expect(isValidType('admin')).toBe(false);
+      expect(isValidType('')).toBe(false);
+      expect(isValidType('COMPETITION')).toBe(false);
+    });
+
+    it('buildSafeRgsuUrl returns URL for valid input', () => {
+      const url = buildSafeRgsuUrl('competition', 'abc-123');
+      expect(url).not.toBeNull();
+      expect(url!.hostname).toBe('pk.rgsu.net');
+      expect(url!.pathname).toBe('/competition/abc-123');
+    });
+
+    it('buildSafeRgsuUrl rejects invalid input', () => {
+      expect(buildSafeRgsuUrl('competition', '../etc/passwd')).toBeNull();
+      expect(buildSafeRgsuUrl('admin', 'abc')).toBeNull();
+      expect(buildSafeRgsuUrl('competition', '')).toBeNull();
+    });
+  });
 });
+

@@ -6,6 +6,7 @@ export type ParsedStudent = {
   subjects: number[];
   achievementPoints: number;
   hasOriginal: boolean;
+  hasContract?: boolean;
   semesterPayment?: string;
   priority: number;
   mainHigherPriority: string;
@@ -28,16 +29,52 @@ export type ParseResult = {
 const parseNum = (text: string): number => parseInt(text.trim(), 10) || 0;
 const parseStr = (text: string): string => text.trim();
 
+// Валидация входных параметров API (защита от SSRF/path traversal)
+export const VALID_ID_REGEX = /^[A-Za-z0-9_\-]{1,256}(\/enrolled)?$/;
+
+export function isValidId(id: string): boolean {
+  return VALID_ID_REGEX.test(id);
+}
+
+export function isValidType(type: string): boolean {
+  return type === 'competition' || type === 'contest';
+}
+
+export function buildSafeRgsuUrl(type: string, id: string): URL | null {
+  if (!isValidType(type) || !isValidId(id)) return null;
+  try {
+    const url = new URL(`https://pk.rgsu.net/${type}/${id}`);
+    if (url.hostname !== 'pk.rgsu.net') return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+
+// Безопасное извлечение содержимого <td>...</td> через парсинг по символу '>'
+// вместо regex с [\s\S]*? (предотвращает ReDoS)
 function extractCells(trHtml: string): string[] {
   const cells: string[] = [];
-  const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-  let match;
-  while ((match = cellRegex.exec(trHtml)) !== null) {
-    const inner = match[1].replace(/<[^>]+>/g, '').trim();
+  let i = 0;
+  const len = trHtml.length;
+  while (i < len) {
+    const openMatch = trHtml.indexOf('<td', i);
+    if (openMatch === -1) break;
+    // пропускаем атрибуты до '>'
+    const closeAngle = trHtml.indexOf('>', openMatch);
+    if (closeAngle === -1) break;
+    const contentStart = closeAngle + 1;
+    const closeTd = trHtml.indexOf('</td>', contentStart);
+    if (closeTd === -1) break;
+    const inner = trHtml.slice(contentStart, closeTd).replace(/<[^>]+>/g, '').trim();
     cells.push(inner);
+    i = closeTd + 5;
   }
   return cells;
 }
+
+// Безопасное извлечение строк <tr ...>...</tr> через indexOf вместо [\s\S]*?
+// (реализация встроена непосредственно в parseRgsuHtml)
 
 function parseCompetitionRow(cells: string[], index: number): ParsedStudent | null {
   try {
@@ -74,6 +111,13 @@ function parseContestRow(cells: string[], index: number): ParsedStudent | null {
     const uniqueCode = parseStr(cells[1]);
     if (!uniqueCode || uniqueCode === '-') return null;
 
+    // Реальные заголовки колонок для contest-страниц:
+    // cells[8] = «Наличие заключённого договора» (Да/Нет)
+    // cells[9] = «Оплата по договору» (Да/Нет)
+    // cells[10] = «Приоритет»
+    const hasContract = cells[8] ? parseStr(cells[8]).toLowerCase() === 'да' : false;
+    const semesterPayment = cells[9] ? parseStr(cells[9]) : 'Нет';
+
     return {
       id: `student-${index}`,
       uniqueCode,
@@ -81,11 +125,12 @@ function parseContestRow(cells: string[], index: number): ParsedStudent | null {
       examPoints: parseNum(cells[3]),
       subjects: [parseNum(cells[4]), parseNum(cells[5]), parseNum(cells[6])],
       achievementPoints: parseNum(cells[7]),
-      hasOriginal: cells[8] ? parseStr(cells[8]).toLowerCase() === 'да' : false,
-      semesterPayment: cells[9] ? parseStr(cells[9]) : 'Нет',
+      hasOriginal: false,
+      hasContract,
+      semesterPayment,
       priority: cells[10] ? parseNum(cells[10]) : 1,
       mainHigherPriority: '-',
-      higherPassingPriority: '1',
+      higherPassingPriority: '-',
       preemptiveRight1: cells[11] ? parseStr(cells[11]) : 'Нет',
       preemptiveRight2: cells[12] ? parseStr(cells[12]) : 'Нет',
       idAtEquality: cells[13] ? parseStr(cells[13]) : 'Нет',
@@ -143,68 +188,96 @@ export function parseRgsuHtml(html: string, type: string): ParseResult {
   const warnings: string[] = [];
 
   let seats = 0;
-  // Primary: find card whose caption contains "Количество мест" or starts with "Места"
-  const seatCardMatch = html.match(/<span class="faculty-intro__card-caption">[^<]*(?:Количество мест|Места)[^<]*<\/span>\s*<p class="faculty-intro__card-text">\s*(\d+)/i);
-  if (seatCardMatch) {
-    seats = parseInt(seatCardMatch[1], 10) || 0;
-  } else {
-    // Fallback: any caption containing "мест"
-    const seatMatch = html.match(/faculty-intro__card-caption[^>]*>[^<]*мест/i);
-    if (seatMatch && seatMatch.index !== undefined) {
-      const cardBlock = html.slice(seatMatch.index, seatMatch.index + 500);
-      const valMatch = cardBlock.match(/faculty-intro__card-text[^>]*>\s*(\d+)/i);
-      if (valMatch) seats = parseInt(valMatch[1], 10) || 0;
-    }
-  }
-
-  const updMatch = html.match(/Сведения\s+обновлены:\s*([^<]+)/i);
-  const updatedAt = updMatch ? updMatch[1].trim() : null;
-
-  const parseRowsFromRegex = (regex: RegExp) => {
-    let match;
-    let index = 0;
-    let skipped = 0;
-    while ((match = regex.exec(html)) !== null) {
-      const trHtml = match[1];
-      const cells = extractCells(trHtml);
-      if (cells.length >= 5) {
-        let student: ParsedStudent | null = null;
-        if (cells.length >= 15) {
-          student = type === 'contest' ? parseContestRow(cells, index) : parseCompetitionRow(cells, index);
-        } else {
-          student = parseEnrolledRow(cells, index);
+  // seats: ищем faculty-intro__card-caption с "Количество мест"/"Места",
+  // затем ближайший card-text с числом. Линейный indexOf — без backtracking.
+  const seatCaptionNeedle = 'faculty-intro__card-caption';
+  const seatTextNeedle = 'faculty-intro__card-text';
+  let searchFrom = 0;
+  while (true) {
+    const capIdx = html.indexOf(seatCaptionNeedle, searchFrom);
+    if (capIdx === -1) break;
+    const capOpenEnd = html.indexOf('>', capIdx);
+    if (capOpenEnd === -1) break;
+    // определяем тип тега, чтобы корректно найти его закрытие
+    const before = html.slice(Math.max(0, capIdx - 10), capIdx);
+    const tagNameMatch = before.match(/<([a-zA-Z][a-zA-Z0-9]*)\s*$/);
+    const tagName = tagNameMatch ? tagNameMatch[1] : 'div';
+    const tagEnd = html.indexOf(`</${tagName}>`, capOpenEnd);
+    if (tagEnd === -1) break;
+    const caption = html.slice(capOpenEnd + 1, tagEnd);
+    if (/Количество мест|Места/i.test(caption) || /мест/i.test(caption)) {
+      const textIdx = html.indexOf(seatTextNeedle, tagEnd);
+      if (textIdx !== -1) {
+        const textOpenEnd = html.indexOf('>', textIdx);
+        if (textOpenEnd !== -1) {
+          const textBefore = html.slice(Math.max(0, textIdx - 10), textIdx);
+          const textTagMatch = textBefore.match(/<([a-zA-Z][a-zA-Z0-9]*)\s*$/);
+          const textTagName = textTagMatch ? textTagMatch[1] : 'div';
+          const textCloseIdx = html.indexOf(`</${textTagName}>`, textOpenEnd);
+          if (textCloseIdx !== -1) {
+            const digits = html.slice(textOpenEnd + 1, textCloseIdx).trim().match(/^\d+/);
+            if (digits) seats = parseInt(digits[0], 10) || 0;
+          }
         }
-        if (student) {
-          students.push(student);
-        } else {
-          skipped++;
-        }
-      } else {
-        skipped++;
       }
-      index++;
+      break;
     }
-    return { count: index, skipped };
-  };
-
-  // Try matching data-unique-code rows first
-  let rowRegex = /<tr\s+data-unique-code="[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
-  let { count: rowCount, skipped: skippedRows } = parseRowsFromRegex(rowRegex);
-
-  // If no students found with data-unique-code, fallback to any tr tags
-  if (students.length === 0) {
-    rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-    const res = parseRowsFromRegex(rowRegex);
-    rowCount = res.count;
-    skippedRows = res.skipped;
+    searchFrom = tagEnd + 1;
   }
 
-  if (students.length === 0 && rowCount === 0) {
+  const updIdx = html.indexOf('Сведения');
+  let updatedAt: string | null = null;
+  if (updIdx !== -1) {
+    const updSlice = html.slice(updIdx, updIdx + 500);
+    const m = updSlice.match(/Сведения\s+обновлены:\s*([^<]+)/i);
+    if (m) updatedAt = m[1].trim();
+  }
+
+  // Извлекаем строки tr: сначала те, что содержат data-unique-code
+  const rowsWithCode: string[] = [];
+  const rowsAny: string[] = [];
+  {
+    let pos = 0;
+    while (pos < html.length) {
+      const trOpen = html.indexOf('<tr', pos);
+      if (trOpen === -1) break;
+      const trOpenEnd = html.indexOf('>', trOpen);
+      if (trOpenEnd === -1) break;
+      const openTag = html.slice(trOpen, trOpenEnd + 1);
+      const trClose = html.indexOf('</tr>', trOpenEnd + 1);
+      if (trClose === -1) break;
+      const content = html.slice(trOpenEnd + 1, trClose);
+      rowsAny.push(content);
+      if (/data-unique-code\s*=\s*"/.test(openTag)) rowsWithCode.push(content);
+      pos = trClose + 5;
+    }
+  }
+
+  const sourceRows = rowsWithCode.length > 0 ? rowsWithCode : rowsAny;
+  let skipped = 0;
+
+  sourceRows.forEach((trHtml, index) => {
+    const cells = extractCells(trHtml);
+    if (cells.length < 5) {
+      skipped++;
+      return;
+    }
+    let student: ParsedStudent | null = null;
+    if (cells.length >= 15) {
+      student = type === 'contest' ? parseContestRow(cells, index) : parseCompetitionRow(cells, index);
+    } else {
+      student = parseEnrolledRow(cells, index);
+    }
+    if (student) students.push(student);
+    else skipped++;
+  });
+
+  if (students.length === 0 && sourceRows.length === 0) {
     warnings.push('Таблица с данными не найдена на странице.');
-  } else if (skippedRows > 0 && students.length === 0) {
+  } else if (skipped > 0 && students.length === 0) {
     warnings.push('Не удалось распознать ни одной строки. Возможно, изменилась структура HTML.');
-  } else if (skippedRows > 0) {
-    warnings.push(`Пропущено ${skippedRows} строк из-за ошибок парсинга.`);
+  } else if (skipped > 0) {
+    warnings.push(`Пропущено ${skipped} строк из-за ошибок парсинга.`);
   }
 
   if (students.length === 0 && seats === 0) {

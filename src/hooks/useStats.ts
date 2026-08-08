@@ -29,7 +29,7 @@ export function useStats(
 
     const admitted = activeBasis === 'Бюджет'
       ? rankedStudents.filter(s => s.higherPassingPriority !== '-' && s.higherPassingPriority !== 'Нет')
-      : rankedStudents.filter(s => s.hasOriginal);
+      : rankedStudents.filter(s => s.hasContract || s.hasOriginal);
 
     if (admitted.length >= seats && seats > 0) {
       predictedPassing = admitted[seats - 1].totalPoints;

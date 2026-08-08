@@ -51,6 +51,8 @@ function AppContent() {
     fetchError,
     seatsByComp,
     setSeatsByComp,
+    dataSource,
+    archivedAt,
   } = useCompetitionData(selectedCompId, activeBasis);
 
   const seatsOf = useCallback(
@@ -121,6 +123,26 @@ function AppContent() {
     return normCodes.size;
   }, [allCompStudents]);
 
+  // Print orientation: landscape for Distribution, portrait for Paid lists.
+  // Toggle a class on <html> via beforeprint/afterprint so styles apply
+  // before the print dialog renders.
+  useEffect(() => {
+    const orientationClass = 'print-landscape';
+    const onBeforePrint = () => {
+      document.documentElement.classList.toggle(orientationClass, activeView === 'distribution');
+    };
+    const onAfterPrint = () => {
+      document.documentElement.classList.remove(orientationClass);
+    };
+    window.addEventListener('beforeprint', onBeforePrint);
+    window.addEventListener('afterprint', onAfterPrint);
+    return () => {
+      window.removeEventListener('beforeprint', onBeforePrint);
+      window.removeEventListener('afterprint', onAfterPrint);
+      document.documentElement.classList.remove(orientationClass);
+    };
+  }, [activeView]);
+
   const syncActive = isLoading || loadingAllDirs;
   const [syncVisible, setSyncVisible] = useState(false);
   const syncStartRef = useRef<number | null>(null);
@@ -144,7 +166,7 @@ function AppContent() {
     } else if (activeView === 'my-position') {
       document.title = 'Мониторинг конкурсных списков РГСУ — Моя позиция в конкурсе';
     } else if (activeView === 'paid-lists') {
-      document.title = 'Мониторинг конкурсных списков РГСУ — Списки по платному';
+      document.title = 'Мониторинг конкурсных списков РГСУ — Конкурс по платному приёму';
     } else {
       document.title = `Мониторинг конкурсных списков РГСУ — ${selectedComp.title.replace(' — ', ' ')}`;
     }
@@ -340,6 +362,8 @@ function AppContent() {
                   activeBasis={activeBasis}
                   accent={accent}
                   updatedAt={updatedAt}
+                  dataSource={dataSource}
+                  archivedAt={archivedAt}
                 />
 
                 <StatsCards
@@ -435,7 +459,7 @@ function AppContent() {
             )}
           >
             <GraduationScrollIcon className={cn("w-5 h-5 mb-0.5", activeView === 'paid-lists' ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400")} />
-            Списки платного
+            Конкурс по платному приёму
           </button>
         </div>
       </nav>

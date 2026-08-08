@@ -1,6 +1,23 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { LRUCache } from 'lru-cache';
+import { loadArchivedOrder, loadArchivedOrderViaFetch } from '../../../shared/archive';
+import { competitionIdFromPath } from '../../../shared/competition-map';
 
-// ── Inlined parser (shared/parser.ts) ──────────────────────────────────────
+// ── Валидация входных параметров (вынесено из parser.ts) ──────────────────
+const VALID_ID_REGEX = /^[A-Za-z0-9_\-]{1,256}(\/enrolled)?$/;
+function isValidId(id: string): boolean { return VALID_ID_REGEX.test(id); }
+function isValidType(type: string): boolean { return type === 'competition' || type === 'contest'; }
+function buildSafeRgsuUrl(type: string, id: string): URL | null {
+  if (!isValidType(type) || !isValidId(id)) return null;
+  try {
+    const url = new URL(`https://pk.rgsu.net/${type}/${id}`);
+    if (url.hostname !== 'pk.rgsu.net') return null;
+    return url;
+  } catch {
+    return null;
+  }
+}
+// ──────────────────────────────────────────────────────────────────────────
 type ParsedStudent = {
   id: string;
   uniqueCode: string;
@@ -9,6 +26,7 @@ type ParsedStudent = {
   subjects: number[];
   achievementPoints: number;
   hasOriginal: boolean;
+  hasContract?: boolean;
   semesterPayment?: string;
   priority: number;
   mainHigherPriority: string;
@@ -31,13 +49,22 @@ type ParseResult = {
 const parseNum = (text: string): number => parseInt(text.trim(), 10) || 0;
 const parseStr = (text: string): string => text.trim();
 
+// Безопасное извлечение содержимого <td>...</td> через indexOf (защита от ReDoS)
 function extractCells(trHtml: string): string[] {
   const cells: string[] = [];
-  const cellRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-  let match;
-  while ((match = cellRegex.exec(trHtml)) !== null) {
-    const inner = match[1].replace(/<[^>]+>/g, '').trim();
+  let i = 0;
+  const len = trHtml.length;
+  while (i < len) {
+    const openMatch = trHtml.indexOf('<td', i);
+    if (openMatch === -1) break;
+    const closeAngle = trHtml.indexOf('>', openMatch);
+    if (closeAngle === -1) break;
+    const contentStart = closeAngle + 1;
+    const closeTd = trHtml.indexOf('</td>', contentStart);
+    if (closeTd === -1) break;
+    const inner = trHtml.slice(contentStart, closeTd).replace(/<[^>]+>/g, '').trim();
     cells.push(inner);
+    i = closeTd + 5;
   }
   return cells;
 }
@@ -134,60 +161,83 @@ function parseRgsuHtml(html: string, type: string): ParseResult {
   const students: ParsedStudent[] = [];
   const warnings: string[] = [];
   let seats = 0;
-  const seatCardMatch = html.match(/<span class="faculty-intro__card-caption">[^<]*(?:Количество мест|Места)[^<]*<\/span>\s*<p class="faculty-intro__card-text">\s*(\d+)/i);
-  if (seatCardMatch) {
-    seats = parseInt(seatCardMatch[1], 10) || 0;
-  } else {
-    const seatMatch = html.match(/faculty-intro__card-caption[^>]*>[^<]*мест/i);
-    if (seatMatch && seatMatch.index !== undefined) {
-      const cardBlock = html.slice(seatMatch.index, seatMatch.index + 500);
-      const valMatch = cardBlock.match(/faculty-intro__card-text[^>]*>\s*(\d+)/i);
-      if (valMatch) seats = parseInt(valMatch[1], 10) || 0;
-    }
-  }
-  const updMatch = html.match(/Сведения\s+обновлены:\s*([^<]+)/i);
-  const updatedAt = updMatch ? updMatch[1].trim() : null;
-
-  const parseRowsFromRegex = (regex: RegExp) => {
-    let match;
-    let index = 0;
-    let skipped = 0;
-    while ((match = regex.exec(html)) !== null) {
-      const trHtml = match[1];
-      const cells = extractCells(trHtml);
-      if (cells.length >= 5) {
-        let student: ParsedStudent | null = null;
-        if (cells.length >= 15) {
-          student = type === 'contest' ? parseContestRow(cells, index) : parseCompetitionRow(cells, index);
-        } else {
-          student = parseEnrolledRow(cells, index);
+  const seatCaptionNeedle = 'faculty-intro__card-caption';
+  const seatTextNeedle = 'faculty-intro__card-text';
+  let searchFrom = 0;
+  while (true) {
+    const capIdx = html.indexOf(seatCaptionNeedle, searchFrom);
+    if (capIdx === -1) break;
+    const capOpenEnd = html.indexOf('>', capIdx);
+    if (capOpenEnd === -1) break;
+    const before = html.slice(Math.max(0, capIdx - 10), capIdx);
+    const tagNameMatch = before.match(/<([a-zA-Z][a-zA-Z0-9]*)\s*$/);
+    const tagName = tagNameMatch ? tagNameMatch[1] : 'div';
+    const tagEnd = html.indexOf(`</${tagName}>`, capOpenEnd);
+    if (tagEnd === -1) break;
+    const caption = html.slice(capOpenEnd + 1, tagEnd);
+    if (/Количество мест|Места/i.test(caption) || /мест/i.test(caption)) {
+      const textIdx = html.indexOf(seatTextNeedle, tagEnd);
+      if (textIdx !== -1) {
+        const textOpenEnd = html.indexOf('>', textIdx);
+        if (textOpenEnd !== -1) {
+          const textBefore = html.slice(Math.max(0, textIdx - 10), textIdx);
+          const textTagMatch = textBefore.match(/<([a-zA-Z][a-zA-Z0-9]*)\s*$/);
+          const textTagName = textTagMatch ? textTagMatch[1] : 'div';
+          const textCloseIdx = html.indexOf(`</${textTagName}>`, textOpenEnd);
+          if (textCloseIdx !== -1) {
+            const digits = html.slice(textOpenEnd + 1, textCloseIdx).trim().match(/^\d+/);
+            if (digits) seats = parseInt(digits[0], 10) || 0;
+          }
         }
-        if (student) {
-          students.push(student);
-        } else {
-          skipped++;
-        }
-      } else {
-        skipped++;
       }
-      index++;
+      break;
     }
-    return { count: index, skipped };
-  };
-
-  let rowRegex = /<tr\s+data-unique-code="[^"]*"[^>]*>([\s\S]*?)<\/tr>/gi;
-  let { count: rowCount, skipped: skippedRows } = parseRowsFromRegex(rowRegex);
-
-  if (students.length === 0) {
-    rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
-    const res = parseRowsFromRegex(rowRegex);
-    rowCount = res.count;
-    skippedRows = res.skipped;
+    searchFrom = tagEnd + 1;
   }
 
-  if (students.length === 0 && rowCount === 0) warnings.push('Таблица с данными не найдена на странице.');
-  else if (skippedRows > 0 && students.length === 0) warnings.push('Не удалось распознать ни одной строки.');
-  else if (skippedRows > 0) warnings.push(`Пропущено ${skippedRows} строк.`);
+  const updIdx = html.indexOf('Сведения');
+  let updatedAt: string | null = null;
+  if (updIdx !== -1) {
+    const updSlice = html.slice(updIdx, updIdx + 500);
+    const m = updSlice.match(/Сведения\s+обновлены:\s*([^<]+)/i);
+    if (m) updatedAt = m[1].trim();
+  }
+
+  const rowsWithCode: string[] = [];
+  const rowsAny: string[] = [];
+  let pos = 0;
+  while (pos < html.length) {
+    const trOpen = html.indexOf('<tr', pos);
+    if (trOpen === -1) break;
+    const trOpenEnd = html.indexOf('>', trOpen);
+    if (trOpenEnd === -1) break;
+    const openTag = html.slice(trOpen, trOpenEnd + 1);
+    const trClose = html.indexOf('</tr>', trOpenEnd + 1);
+    if (trClose === -1) break;
+    const content = html.slice(trOpenEnd + 1, trClose);
+    rowsAny.push(content);
+    if (/data-unique-code\s*=\s*"/.test(openTag)) rowsWithCode.push(content);
+    pos = trClose + 5;
+  }
+
+  const sourceRows = rowsWithCode.length > 0 ? rowsWithCode : rowsAny;
+  let skipped = 0;
+  sourceRows.forEach((trHtml, index) => {
+    const cells = extractCells(trHtml);
+    if (cells.length < 5) { skipped++; return; }
+    let student: ParsedStudent | null = null;
+    if (cells.length >= 15) {
+      student = type === 'contest' ? parseContestRow(cells, index) : parseCompetitionRow(cells, index);
+    } else {
+      student = parseEnrolledRow(cells, index);
+    }
+    if (student) students.push(student);
+    else skipped++;
+  });
+
+  if (students.length === 0 && sourceRows.length === 0) warnings.push('Таблица с данными не найдена на странице.');
+  else if (skipped > 0 && students.length === 0) warnings.push('Не удалось распознать ни одной строки.');
+  else if (skipped > 0) warnings.push(`Пропущено ${skipped} строк.`);
   if (students.length === 0 && seats === 0) warnings.push('Ни студенты, ни места не найдены.');
   return { students, updatedAt, seats, warnings };
 }
@@ -197,15 +247,46 @@ const FETCH_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS) || 50000;
 const RETRY_ATTEMPTS = Number(process.env.RETRY_ATTEMPTS) || 2;
 const RETRY_DELAY_MS = Number(process.env.RETRY_DELAY_MS) || 1000;
 const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS) || 3 * 60 * 1000;
+const MAX_RESPONSE_BYTES = Number(process.env.MAX_RESPONSE_BYTES) || 5 * 1024 * 1024; // 5 МБ
+const CACHE_MAX_ENTRIES = Number(process.env.CACHE_MAX_ENTRIES) || 500;
 
 interface CacheEntry { data: ParseResult; fetchedAt: number; }
-const cache = new Map<string, CacheEntry>();
+const cache = new LRUCache<string, CacheEntry>({
+  max: CACHE_MAX_ENTRIES,
+  ttl: CACHE_TTL_MS,
+  ttlAutopurge: true,
+});
 
 function getCached(key: string): ParseResult | null {
   const entry = cache.get(key);
   if (!entry) return null;
-  if (Date.now() - entry.fetchedAt > CACHE_TTL_MS) { cache.delete(key); return null; }
+  if (entry.data.students.length === 0) {
+    cache.delete(key);
+    return null;
+  }
   return entry.data;
+}
+
+async function readBoundedHtml(response: Response): Promise<string> {
+  const contentLength = Number(response.headers.get('content-length') || 0);
+  if (contentLength > MAX_RESPONSE_BYTES) {
+    throw new Error(`Response too large: ${contentLength} bytes`);
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error('No response body');
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.byteLength;
+    if (received > MAX_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new Error(`Response exceeded ${MAX_RESPONSE_BYTES} bytes`);
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8');
 }
 
 async function fetchHtml(url: string): Promise<string> {
@@ -221,9 +302,10 @@ async function fetchHtml(url: string): Promise<string> {
           'Cache-Control': 'no-cache',
         },
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        redirect: 'follow',
       });
       if (!response.ok) throw new Error(`RGSU ${response.status} ${response.statusText}`);
-      return await response.text();
+      return await readBoundedHtml(response);
     } catch (error: any) {
       lastError = error;
       if (attempt < RETRY_ATTEMPTS) await new Promise(r => setTimeout(r, RETRY_DELAY_MS * (attempt + 1)));
@@ -245,14 +327,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!type || !id) return res.status(400).json({ success: false, error: 'Invalid params' });
-  if (type !== 'competition' && type !== 'contest') return res.status(400).json({ success: false, error: 'Invalid type' });
+
+  // Защита от SSRF/path traversal: единая валидация
+  if (!buildSafeRgsuUrl(type, id)) {
+    return res.status(400).json({ success: false, error: 'Invalid id' });
+  }
 
   const cacheKey = `${type}:${id}`;
+  const competitionId = competitionIdFromPath(`https://pk.rgsu.net/${type}/${id}`);
+
   const cached = getCached(cacheKey);
   if (cached) {
     res.setHeader('X-Cache', 'HIT');
+    res.setHeader('X-Source', 'live');
     res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=60');
-    return res.json({ success: true, data: cached.students, updatedAt: cached.updatedAt, seats: cached.seats, warnings: cached.warnings });
+    return res.json({
+      success: true,
+      source: 'live',
+      competitionId,
+      data: cached.students,
+      updatedAt: cached.updatedAt,
+      seats: cached.seats,
+      warnings: cached.warnings,
+    });
   }
 
   try {
@@ -260,10 +357,59 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = parseRgsuHtml(html, type);
     cache.set(cacheKey, { data: result, fetchedAt: Date.now() });
     res.setHeader('X-Cache', 'MISS');
+    res.setHeader('X-Source', 'live');
     res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=60');
-    return res.json({ success: true, data: result.students, updatedAt: result.updatedAt, seats: result.seats, warnings: result.warnings });
+    return res.json({
+      success: true,
+      source: 'live',
+      competitionId,
+      data: result.students,
+      updatedAt: result.updatedAt,
+      seats: result.seats,
+      warnings: result.warnings,
+    });
   } catch (error: any) {
-    console.error('Error:', error.message);
-    return res.status(500).json({ success: false, error: error.message, isTimeout: error.name === 'TimeoutError' });
+    // Не логируем полный error.message (может содержать URL c id)
+    const kind = error.name === 'TimeoutError' ? 'TIMEOUT'
+      : /too large|exceeded/i.test(error.message || '') ? 'TOO_LARGE'
+      : 'FETCH_FAILED';
+    console.error(`[API Error] key=${cacheKey} kind=${kind}`);
+
+    // Fallback: пробуем отдать заархивированный приказ (если есть локальный архив
+    // или публичный URL на свой же /orders/*.json для serverless)
+    if (competitionId) {
+      const archived =
+        (await loadArchivedOrder(competitionId)) ??
+        (await loadArchivedOrderViaFetch(competitionId));
+      if (archived) {
+        console.warn(`[API Fallback] serving archive for ${competitionId}`);
+        res.setHeader('X-Source', 'archive');
+        res.setHeader('X-Cache', 'BYPASS');
+        res.setHeader('X-Archive-Date', archived.archivedAt);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        return res.json({
+          success: true,
+          source: 'archive',
+          competitionId,
+          data: archived.data.students,
+          updatedAt: archived.data.updatedAt,
+          seats: archived.data.seats,
+          warnings: [
+            ...archived.data.warnings,
+            'Данные из локального архива — сервер pk.rgsu.net временно недоступен',
+          ],
+          archivedAt: archived.archivedAt,
+        });
+      }
+    }
+
+    const isTimeout = kind === 'TIMEOUT';
+    const status = isTimeout ? 504 : 502;
+    const safeError = isTimeout
+      ? 'Upstream timeout'
+      : kind === 'TOO_LARGE'
+        ? 'Upstream response too large'
+        : 'Upstream fetch failed';
+    return res.status(status).json({ success: false, error: safeError, isTimeout });
   }
 }

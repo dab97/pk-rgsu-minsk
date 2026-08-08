@@ -210,7 +210,7 @@ export function DistributionView({
                   <tr>
                     <th className="px-4 py-2.5 text-left font-medium sticky left-0 z-10 bg-slate-50 dark:bg-slate-900 sm:w-56 min-w-40 print:min-w-56">Направление</th>
                     {buckets.map((b, i) => (
-                      <th key={i} className="px-2 py-2.5 text-center font-medium tabular-nums">{b.label}</th>
+                      <th key={i} className="px-1 py-2.5 text-center font-medium tabular-nums whitespace-nowrap print:px-0.5 print:text-[7pt]">{b.label}</th>
                     ))}
                     <th className="px-4 py-2.5 text-center font-medium">Всего</th>
                   </tr>
@@ -251,8 +251,8 @@ export function DistributionView({
                                       <span
                                         tabIndex={0}
                                         className={cn(
-                                          "inline-flex items-center justify-center font-semibold cursor-help",
-                                          String(c).length <= 2 ? "w-11 h-11 rounded-full" : "h-11 min-w-11 px-2 rounded-full",
+                                          "inline-flex items-center justify-center font-semibold cursor-help print:bg-transparent print:p-0",
+                                          String(c).length <= 2 ? "w-11 h-11 rounded-full print:w-auto print:h-auto print:rounded-none" : "h-11 min-w-11 px-2 rounded-full print:h-auto print:min-w-0 print:rounded-none print:px-0",
                                           basis === 'Бюджет'
                                             ? "bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300"
                                             : "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"

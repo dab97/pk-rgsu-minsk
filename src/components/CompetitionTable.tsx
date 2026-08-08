@@ -266,7 +266,9 @@ export function CompetitionTable({
                         {student.achievementPoints}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-center">
-                        {student.hasOriginal ? 'Да' : 'Нет'}
+                        {activeBasis === 'Бюджет'
+                          ? (student.hasOriginal ? 'Да' : 'Нет')
+                          : (student.hasContract ? 'Да' : 'Нет')}
                       </TableCell>
                       {activeBasis === 'Платное' && (
                         <TableCell className="whitespace-nowrap text-center">

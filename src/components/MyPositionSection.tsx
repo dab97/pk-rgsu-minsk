@@ -231,7 +231,7 @@ export function MyPositionSection({
                                 <td className="px-2.5 py-1.5 text-right tabular-nums">{row.rank} / {row.total}</td>
                                 <td className="px-2.5 py-1.5 text-right font-medium tabular-nums">{row.points}</td>
                                 <td className="px-2.5 py-1.5 text-center">
-                                  {row.hasOriginal
+                                  {(isBudget ? row.hasOriginal : row.hasContract)
                                     ? <CheckmarkCircle01Icon className="h-3.5 w-3.5 inline text-emerald-500" />
                                     : <span className="text-slate-300 dark:text-slate-600">—</span>}
                                 </td>

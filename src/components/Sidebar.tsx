@@ -160,7 +160,7 @@ export function Sidebar({
         )}>
           <GraduationScrollIcon className="w-4 h-4" />
         </div>
-        <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300 text-center leading-tight">Списки платного</span>
+        <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300 text-center leading-tight">Конкурс по платному приёму</span>
       </button>
     </div>
   );
@@ -224,7 +224,7 @@ export function Sidebar({
         )}>
           <GraduationScrollIcon className="w-4 h-4" />
         </div>
-        <span className="truncate">Списки по платному</span>
+        <span className="truncate">Конкурс по платному приёму</span>
       </button>
     </div>
   );
