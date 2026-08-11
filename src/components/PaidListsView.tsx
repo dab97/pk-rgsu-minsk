@@ -369,17 +369,17 @@ export function PaidListsView({
       {/* Dedicated Direction Table Section (Flat Header + Single Clean Table Container) */}
       <div id="paid-lists-print-area" className="flex flex-col gap-4">
         {/* Official Document Print Header (Only visible in Print/PDF) */}
-        <div className="hidden print:block mb-1 text-slate-900">
-          <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500 mb-1 flex items-center justify-between">
+        <div className="hidden print:block mb-2 text-slate-900 pb-1.5 border-b border-black">
+          <div className="print-doc-sub text-[10px] uppercase tracking-wider font-semibold text-slate-600 mb-1 flex items-center justify-between">
             <span>Филиал РГСУ в г. Минске</span>
             <span>Приёмная комиссия — 2026</span>
           </div>
-          <h1 className="text-base font-bold uppercase tracking-tight text-slate-900">
+          <h1 className="print-doc-header text-base font-bold uppercase tracking-tight text-slate-900 mb-1">
             Ранжированный конкурсный список (Платное обучение)
           </h1>
-          <div className="text-xs font-medium text-slate-800 mt-1 flex items-center justify-between">
-            <span>Направление: <strong>{selectedResult ? selectedResult.comp.title : ''} ({selectedResult?.comp.studyForm})</strong></span>
-            <span>Количество мест: <strong>{selectedResult?.seats}</strong></span>
+          <div className="print-doc-meta text-sm font-bold text-slate-900 flex items-center justify-between gap-4">
+            <span>Направление: <span className="font-bold">{selectedResult ? selectedResult.comp.title : ''} ({selectedResult?.comp.studyForm})</span></span>
+            <span className="shrink-0">Количество мест: <span className="font-bold tabular-nums">{selectedResult?.seats}</span></span>
           </div>
         </div>
 
@@ -603,7 +603,7 @@ export function PaidListsView({
                   <TableRow>
                     <TableHead className="w-10 text-center py-2.5 px-1.5 text-[11px] leading-tight">№ п/п</TableHead>
                     {col('effectiveRank') && <TableHead className="w-14 text-center py-2.5 px-1.5 text-[11px] leading-tight font-bold">Эфф. №</TableHead>}
-                    <TableHead className="py-2.5 px-2 text-[11px] leading-tight min-w-24 print:min-w-0">Уникальный код</TableHead>
+                    <TableHead className="py-2.5 px-2 text-[11px] leading-tight min-w-20 print:min-w-0 print:px-1 text-center">Уникальный<br className="hidden print:inline" /> код</TableHead>
                     <TableHead className="w-14 text-center py-2.5 px-1.5 text-[11px] leading-tight">Приоритет</TableHead>
                     <TableHead className="text-center font-bold text-amber-700 dark:text-amber-400 py-2.5 px-2 text-[11px] leading-tight">Сумма баллов</TableHead>
                     {col('examPoints') && <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Баллы ВИ</TableHead>}
@@ -615,7 +615,7 @@ export function PaidListsView({
                     {col('hasContract') && <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Договор</TableHead>}
                     {col('semesterPayment') && <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Оплата</TableHead>}
                     {col('applicationStatus') && <TableHead className="text-center py-2.5 px-2 text-[11px] leading-tight min-w-36 print:min-w-0">Статус заявления</TableHead>}
-                    <TableHead className="text-left py-2.5 px-2 text-[11px] leading-tight min-w-44 print:min-w-0">Статус зачисления</TableHead>
+                    <TableHead className="text-center py-2.5 px-2 text-[11px] leading-tight min-w-44 print:min-w-0">Статус зачисления</TableHead>
                   </TableRow>
                 </TableHeader>
 
@@ -638,7 +638,7 @@ export function PaidListsView({
                           className={cn(
                             isPassing ? "bg-amber-50/40 dark:bg-amber-950/20" : "",
                             isWithdrawn ? "opacity-60 bg-slate-50/50 dark:bg-slate-900/40" : "",
-                            isLastSeat ? "border-b-2 border-amber-500 dark:border-amber-600" : ""
+                            isLastSeat ? "border-b-2 border-amber-500 dark:border-amber-600 print:border-b-0" : ""
                           )}
                         >
                           <TableCell className="text-center text-slate-500 tabular-nums font-mono py-2 px-1.5">{item.rawRank}</TableCell>
@@ -649,7 +649,7 @@ export function PaidListsView({
                                 : <span className="text-slate-400">—</span>}
                             </TableCell>
                           )}
-                          <TableCell className="font-mono font-medium text-slate-900 dark:text-slate-100 py-2 px-2">{item.student.uniqueCode}</TableCell>
+                          <TableCell className="font-mono font-medium text-slate-900 dark:text-slate-100 py-2 px-2 unique-code-cell whitespace-nowrap">{item.student.uniqueCode}</TableCell>
                           <TableCell className="text-center py-2 px-1.5"><span className="text-sm font-bold tabular-nums">{item.student.priority}</span></TableCell>
                           <TableCell className="text-center tabular-nums font-bold text-amber-700 dark:text-amber-300 text-sm py-2 px-2">{item.student.totalPoints}</TableCell>
                           {col('examPoints') && <TableCell className="text-center tabular-nums font-medium text-slate-700 dark:text-slate-300 py-2 px-1.5">{item.student.examPoints}</TableCell>}
@@ -687,95 +687,97 @@ export function PaidListsView({
                               </div>
                             </TableCell>
                           )}
-                          <TableCell className="text-left py-2 px-2">
-                            {isPassing ? (
-                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/80 w-fit">
-                                <CheckmarkCircle01Icon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                                <span>Зачислен</span>
-                              </div>
-                            ) : isWithdrawn ? (
-                              item.passedCompTitle ? (
-                                <TooltipProvider delayDuration={100}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/80 w-fit cursor-pointer hover:bg-amber-100/70 transition-colors">
-                                        <span>Выбыл (Зачислен на Пр. {item.passedPriority})</span>
-                                        <ArrowRight01Icon className="w-3.5 h-3.5 shrink-0 text-amber-600" />
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent
-                                      side="top"
-                                      align="start"
-                                      className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-none text-slate-900 dark:text-slate-100 w-72 z-50"
-                                    >
-                                      <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-2 pb-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                                        <span>Приоритеты абитуриента</span>
-                                        <span className="font-mono text-slate-700 dark:text-slate-300 font-bold">{item.student.uniqueCode}</span>
-                                      </div>
-                                      <div className="flex flex-col gap-1.5">
-                                        {(studentPaidAppsMap.get(item.student.uniqueCode) || []).map((app, appIdx) => (
-                                          <div
-                                            key={appIdx}
-                                            className={cn(
-                                              "grid grid-cols-[1.25rem_1fr_2.5rem_1.25rem] items-center gap-2 p-1.5 rounded-xl text-xs border transition-all",
-                                              app.isEnrolledHere
-                                                ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-medium"
-                                                : "bg-slate-50/50 dark:bg-slate-800/30 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400"
-                                            )}
-                                          >
-                                            <span
-                                              className={cn(
-                                                "w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold shrink-0 tabular-nums leading-none",
-                                                app.isEnrolledHere
-                                                  ? "bg-emerald-600 text-white"
-                                                  : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                                              )}
-                                            >
-                                              {app.priority}
-                                            </span>
-                                            <span className="truncate text-[11px] font-medium leading-none flex items-baseline gap-1">
-                                              <span>{app.compTitle}</span>
-                                              <span className="opacity-50 font-normal text-[10px]">({app.studyForm})</span>
-                                            </span>
-                                            <span className="text-right text-[11px] font-bold tabular-nums text-slate-800 dark:text-slate-200 leading-none">
-                                              {app.totalPoints}
-                                            </span>
-                                            <div
-                                              className="flex items-center justify-end"
-                                              title={
-                                                app.status === 'passing'
-                                                  ? 'Зачислен'
-                                                  : app.status === 'withdrawn'
-                                                    ? 'Выбыл на высший приоритет'
-                                                    : 'В конкурсе'
-                                              }
-                                            >
-                                              {app.status === 'passing' ? (
-                                                <CheckmarkCircle01Icon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                                              ) : app.status === 'withdrawn' ? (
-                                                <CancelCircleIcon className="w-4 h-4 text-amber-500/80 dark:text-amber-400/80 shrink-0" />
-                                              ) : (
-                                                <Clock01Icon className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
-                                              )}
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              ) : (
-                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/80 w-fit">
-                                  <CancelCircleIcon className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
-                                  <span>{item.student.status || 'Не участвует в конкурсе'}</span>
+                          <TableCell className="text-center py-2 px-2">
+                            <div className="flex justify-center">
+                              {isPassing ? (
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/80 w-fit">
+                                  <CheckmarkCircle01Icon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                  <span>Зачислен</span>
                                 </div>
-                              )
-                            ) : (
-                              <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-normal text-slate-500 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 w-fit">
-                                <Clock01Icon className="w-3.5 h-3.5" />
-                                <span>В конкурсе</span>
-                              </div>
-                            )}
+                              ) : isWithdrawn ? (
+                                item.passedCompTitle ? (
+                                  <TooltipProvider delayDuration={100}>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/80 w-fit cursor-pointer hover:bg-amber-100/70 transition-colors">
+                                          <span>Выбыл (Зачислен на Пр. {item.passedPriority})</span>
+                                          <ArrowRight01Icon className="w-3.5 h-3.5 shrink-0 text-amber-600" />
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent
+                                        side="top"
+                                        align="start"
+                                        className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-none text-slate-900 dark:text-slate-100 w-72 z-50"
+                                      >
+                                        <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-2 pb-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                          <span>Приоритеты абитуриента</span>
+                                          <span className="font-mono text-slate-700 dark:text-slate-300 font-bold">{item.student.uniqueCode}</span>
+                                        </div>
+                                        <div className="flex flex-col gap-1.5">
+                                          {(studentPaidAppsMap.get(item.student.uniqueCode) || []).map((app, appIdx) => (
+                                            <div
+                                              key={appIdx}
+                                              className={cn(
+                                                "grid grid-cols-[1.25rem_1fr_2.5rem_1.25rem] items-center gap-2 p-1.5 rounded-xl text-xs border transition-all",
+                                                app.isEnrolledHere
+                                                  ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-medium"
+                                                  : "bg-slate-50/50 dark:bg-slate-800/30 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400"
+                                              )}
+                                            >
+                                              <span
+                                                className={cn(
+                                                  "w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold shrink-0 tabular-nums leading-none",
+                                                  app.isEnrolledHere
+                                                    ? "bg-emerald-600 text-white"
+                                                    : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                                )}
+                                              >
+                                                {app.priority}
+                                              </span>
+                                              <span className="truncate text-[11px] font-medium leading-none flex items-baseline gap-1">
+                                                <span>{app.compTitle}</span>
+                                                <span className="opacity-50 font-normal text-[10px]">({app.studyForm})</span>
+                                              </span>
+                                              <span className="text-right text-[11px] font-bold tabular-nums text-slate-800 dark:text-slate-200 leading-none">
+                                                {app.totalPoints}
+                                              </span>
+                                              <div
+                                                className="flex items-center justify-end"
+                                                title={
+                                                  app.status === 'passing'
+                                                    ? 'Зачислен'
+                                                    : app.status === 'withdrawn'
+                                                      ? 'Выбыл на высший приоритет'
+                                                      : 'В конкурсе'
+                                                }
+                                              >
+                                                {app.status === 'passing' ? (
+                                                  <CheckmarkCircle01Icon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                                ) : app.status === 'withdrawn' ? (
+                                                  <CancelCircleIcon className="w-4 h-4 text-amber-500/80 dark:text-amber-400/80 shrink-0" />
+                                                ) : (
+                                                  <Clock01Icon className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                                                )}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                ) : (
+                                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/80 w-fit">
+                                    <CancelCircleIcon className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                                    <span>{item.student.status || 'Не участвует в конкурсе'}</span>
+                                  </div>
+                                )
+                              ) : (
+                                <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-normal text-slate-500 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 w-fit">
+                                  <Clock01Icon className="w-3.5 h-3.5" />
+                                  <span>В конкурсе</span>
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );

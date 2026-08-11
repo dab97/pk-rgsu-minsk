@@ -52,24 +52,29 @@
 }
 
 @media print {
-  @page {
-    margin: 8mm 6mm;
-    size: A4 portrait;
-  }
-
-  /* Landscape orientation for Distribution (toggled via .print-landscape on <html>) */
-  html.print-landscape @page {
-    size: A4 landscape;
-  }
-
   body,
   p,
   td,
-  th,
-  div,
-  span {
+  th {
     font-size: 9pt !important;
     line-height: 1.25 !important;
+  }
+
+  .print-doc-sub,
+  .print-doc-sub * {
+    font-size: 8.5pt !important;
+  }
+
+  .print-doc-header {
+    font-size: 13pt !important;
+    line-height: 1.2 !important;
+  }
+
+  .print-doc-meta,
+  .print-doc-meta * {
+    font-size: 11pt !important;
+    font-weight: 700 !important;
+    line-height: 1.3 !important;
   }
 
   body {
@@ -118,29 +123,58 @@
   }
 
   /* Tables — border-collapse + native black borders (like priemka-rgsu) */
-  #distribution-print-area table,
-  #paid-lists-print-area table {
+  #distribution-print-area table {
     width: 100% !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
     margin-bottom: 6mm !important;
   }
 
+  #paid-lists-print-area table {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: auto !important;
+    border-collapse: collapse !important;
+    margin-bottom: 6mm !important;
+    box-sizing: border-box !important;
+  }
+
+  #distribution-print-area tr,
+  #paid-lists-print-area tr {
+    border: none !important;
+  }
+
   #distribution-print-area th,
-  #distribution-print-area td,
-  #paid-lists-print-area th,
-  #paid-lists-print-area td {
+  #distribution-print-area td {
     border: 1px solid #000 !important;
     padding: 3px 4px !important;
     vertical-align: middle;
     color: #000 !important;
     background: #fff !important;
     word-wrap: break-word;
+    box-sizing: border-box !important;
   }
+
+  #paid-lists-print-area th,
+  #paid-lists-print-area td {
+    border: 1px solid #000 !important;
+    padding: 2px 2.5px !important;
+    vertical-align: middle;
+    color: #000 !important;
+    background: #fff !important;
+    word-wrap: break-word;
+    box-sizing: border-box !important;
+  }
+
+  td.unique-code-cell {
+    white-space: nowrap !important;
+  }
+
+
 
   #distribution-print-area thead th,
   #paid-lists-print-area thead th {
-    background: #f1f5f9 !important;
+    background: #e2e8f0 !important;
     font-weight: 600 !important;
     text-align: center !important;
   }
@@ -220,3 +254,5 @@
     background: #fff !important;
   }
 }
+
+

@@ -275,7 +275,7 @@ export function CompetitionTable({
             <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
               <TableRow>
                 <TableHead className="w-16 text-center whitespace-nowrap">№</TableHead>
-                <TableHead className="whitespace-nowrap">Уникальный код</TableHead>
+                <TableHead className="text-center">Уникальный<br className="hidden print:inline" /> код</TableHead>
                 <TableHead
                   className="cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 leading-tight"
                   onClick={() => handleSort('totalPoints')}
@@ -316,7 +316,7 @@ export function CompetitionTable({
                       student.id === meRowHighlight ? "bg-teal-100/70 dark:bg-teal-900/30" : ""
                     )}>
                       <TableCell className="text-center text-slate-500 whitespace-nowrap tabular-nums">{index + 1}</TableCell>
-                      <TableCell className="whitespace-nowrap text-left">{student.uniqueCode}</TableCell>
+                      <TableCell className="whitespace-nowrap text-left unique-code-cell">{student.uniqueCode}</TableCell>
                       <TableCell className={cn("whitespace-nowrap tabular-nums text-center", accent.text)}>{student.totalPoints}</TableCell>
                       {show('examPoints') && <TableCell className="whitespace-nowrap tabular-nums text-center">{student.examPoints}</TableCell>}
                       {show('subjects') && <TableCell className="whitespace-nowrap tabular-nums text-center">{student.subjects[0] || '-'}</TableCell>}
