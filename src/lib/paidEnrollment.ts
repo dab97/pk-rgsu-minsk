@@ -22,6 +22,17 @@ export type CompetitionEnrollmentResult = {
   passingScore: number | null;
 };
 
+export function isInactiveStatus(status?: string): boolean {
+  if (!status) return false;
+  const s = status.toLowerCase().trim();
+  return (
+    s.includes('отозван') ||
+    s.includes('отклонен') ||
+    s.includes('отказ') ||
+    s.includes('забрал')
+  );
+}
+
 /**
  * Multi-tier 5-stage comparison for applicants
  */
@@ -159,6 +170,17 @@ export function computePaidEnrollmentAllocation(
 
   // Set of withdrawn (code + compId)
   const withdrawnSet = new Set<string>();
+
+  // Pre-fill withdrawnSet with applicants having official inactive status (withdrawn, rejected, refused)
+  paidCompetitions.forEach((comp) => {
+    (initialLists[comp.id] || []).forEach(({ student }) => {
+      if (isInactiveStatus(student.status)) {
+        const code = student.uniqueCode || student.id;
+        withdrawnSet.add(`${code}:${comp.id}`);
+      }
+    });
+  });
+
   // Map of allocated (code -> { compId, priority, compTitle })
   const currentAllocated = new Map<string, { compId: string; priority: number; compTitle: string }>();
 

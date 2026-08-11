@@ -13,7 +13,7 @@ export type Student = {
   hasOriginal: boolean;
   hasContract?: boolean;
   semesterPayment?: string;
-  status: 'в конкурсе' | 'зачислен' | 'отказ' | '';
+  status: string;
   mainHigherPriority: string;
   higherPassingPriority: string;
   preemptiveRight1: string;

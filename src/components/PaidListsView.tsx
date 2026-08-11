@@ -15,8 +15,10 @@ import {
   BarChartIcon,
   CancelCircleIcon,
   FilterHorizontalIcon,
+  LayoutThreeColumnIcon,
 } from 'hugeicons-react';
 import { Input } from './ui/input';
+import { getStatusBadge } from './CompetitionTable';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from './ui/table';
@@ -27,6 +29,26 @@ import { Competition, Student } from '../types';
 import { AccentTheme } from '../constants/theme';
 import { competitions } from '../data';
 import { computePaidEnrollmentAllocation } from '../lib/paidEnrollment';
+
+const TOGGLEABLE_COLS = [
+  { key: 'effectiveRank', label: 'Эфф. №' },
+  { key: 'examPoints',    label: 'Баллы ВИ' },
+  { key: 'subject1',      label: 'Предмет 1' },
+  { key: 'subject2',      label: 'Предмет 2' },
+  { key: 'subject3',      label: 'Предмет 3' },
+  { key: 'achievementPoints', label: 'ИД' },
+  { key: 'hasOriginal',   label: 'Оригинал' },
+  { key: 'hasContract',   label: 'Договор' },
+  { key: 'semesterPayment', label: 'Оплата' },
+  { key: 'applicationStatus', label: 'Статус заявления' },
+] as const;
+type ColKey = typeof TOGGLEABLE_COLS[number]['key'];
+type ColVisibility = Record<ColKey, boolean>;
+const DEFAULT_COL_VISIBILITY: ColVisibility = {
+  effectiveRank: true, examPoints: true, subject1: true, subject2: true,
+  subject3: true, achievementPoints: true, hasOriginal: true, hasContract: true,
+  semesterPayment: true, applicationStatus: true,
+};
 
 interface PaidListsViewProps {
   allCompStudents: Record<string, Student[]>;
@@ -41,6 +63,7 @@ export function PaidListsView({
   loading,
   seatsByComp,
   updatedAt,
+  accent,
 }: PaidListsViewProps) {
   const paidCompetitions = useMemo(() => {
     return competitions.filter((c) => c.basis === 'Платное').map((c) => ({
@@ -57,6 +80,17 @@ export function PaidListsView({
   const [hasPaymentOnly, setHasPaymentOnly] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isFilterOpen, setIsFilterOpen] = useState<boolean>(false);
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
+  const [visibleCols, setVisibleCols] = useState<ColVisibility>(DEFAULT_COL_VISIBILITY);
+  const [isColMenuOpen, setIsColMenuOpen] = useState(false);
+
+  const toggleStatus = (s: string) => setStatusFilter(prev => {
+    const next = new Set(prev);
+    if (next.has(s)) next.delete(s); else next.add(s);
+    return next;
+  });
+  const toggleCol = (key: ColKey) => setVisibleCols(prev => ({ ...prev, [key]: !prev[key] }));
+  const col = (key: ColKey) => visibleCols[key];
 
   const budgetEnrolledCount = useMemo(() => {
     const codes = new Set<string>();
@@ -132,6 +166,13 @@ export function PaidListsView({
     return allocationResults[selectedCompId] || null;
   }, [allocationResults, selectedCompId]);
 
+  const availableStatuses = useMemo(() => {
+    if (!selectedResult) return [];
+    const set = new Set<string>();
+    selectedResult.items.forEach(item => { if (item.student.status) set.add(item.student.status); });
+    return Array.from(set).sort();
+  }, [selectedResult]);
+
   const filteredItems = useMemo(() => {
     if (!selectedResult) return [];
     let items = selectedResult.items;
@@ -139,7 +180,9 @@ export function PaidListsView({
     if (passingOnly) {
       items = items.filter((item) => item.allocationStatus === 'passing');
     }
-
+    if (statusFilter.size > 0) {
+      items = items.filter((item) => statusFilter.has(item.student.status));
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       items = items.filter(
@@ -150,7 +193,7 @@ export function PaidListsView({
     }
 
     return items;
-  }, [selectedResult, passingOnly, searchQuery]);
+  }, [selectedResult, passingOnly, statusFilter, searchQuery]);
 
   const loadedDirsCount = paidCompetitions.filter((c) => !!allCompStudents[c.id]).length;
 
@@ -373,7 +416,7 @@ export function PaidListsView({
 
             {/* Filter Dropdown Popover */}
             {(() => {
-              const activeFiltersCount = (passingOnly ? 1 : 0) + (hasContractOnly ? 1 : 0) + (hasPaymentOnly ? 1 : 0);
+              const activeFiltersCount = (passingOnly ? 1 : 0) + (hasContractOnly ? 1 : 0) + (hasPaymentOnly ? 1 : 0) + statusFilter.size;
               return (
                 <div className="relative shrink-0">
                   <button
@@ -408,6 +451,7 @@ export function PaidListsView({
                                 setPassingOnly(false);
                                 setHasContractOnly(false);
                                 setHasPaymentOnly(false);
+                                setStatusFilter(new Set());
                               }}
                               className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
                             >
@@ -463,12 +507,85 @@ export function PaidListsView({
                           />
                           <span className="text-sm font-medium leading-snug">Только с оплатой</span>
                         </label>
+                        {/* Status filter section */}
+                        {availableStatuses.length > 0 && (
+                          <>
+                            <div className="px-2 pt-2 pb-1 border-t border-slate-100 dark:border-slate-800 mt-0.5">
+                              <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Статус заявления</span>
+                            </div>
+                            {availableStatuses.map((s) => (
+                              <label key={s} className={cn(
+                                "flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-all select-none",
+                                statusFilter.has(s)
+                                  ? "bg-amber-50/80 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200"
+                                  : "hover:bg-slate-100/80 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-200"
+                              )}>
+                                <Checkbox
+                                  checked={statusFilter.has(s)}
+                                  onCheckedChange={() => toggleStatus(s)}
+                                  className="w-4 h-4 rounded-md border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white shrink-0"
+                                />
+                                <span className="text-sm font-medium leading-snug truncate">{s}</span>
+                              </label>
+                            ))}
+                          </>
+                        )}
                       </div>
                     </>
                   )}
                 </div>
               );
             })()}
+
+            {/* Column Visibility Toggle */}
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsColMenuOpen(!isColMenuOpen)}
+                className={cn(
+                  "inline-flex items-center gap-2 px-3.5 h-10 rounded-xl border text-xs sm:text-sm font-medium transition-all cursor-pointer shadow-xs select-none",
+                  Object.values(visibleCols).some(v => !v)
+                    ? "bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300"
+                    : "bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                )}
+              >
+                <LayoutThreeColumnIcon className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                <span className="hidden sm:inline">Колонки</span>
+                {Object.values(visibleCols).filter(v => !v).length > 0 && (
+                  <span className="w-5 h-5 rounded-full bg-amber-600 text-white text-[11px] font-bold flex items-center justify-center tabular-nums ml-0.5">
+                    {Object.values(visibleCols).filter(v => !v).length}
+                  </span>
+                )}
+              </button>
+              {isColMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsColMenuOpen(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100 flex flex-col gap-1">
+                    <div className="flex items-center justify-between pb-2 mb-0.5 border-b border-slate-100 dark:border-slate-800 px-2 pt-1">
+                      <span className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Показать колонки</span>
+                      {Object.values(visibleCols).some(v => !v) && (
+                        <button type="button" onClick={() => setVisibleCols(DEFAULT_COL_VISIBILITY)} className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer">Все</button>
+                      )}
+                    </div>
+                    {TOGGLEABLE_COLS.map(({ key, label }) => (
+                      <label key={key} className={cn(
+                        "flex items-center gap-3 px-3 py-2 rounded-xl cursor-pointer transition-all select-none",
+                        visibleCols[key]
+                          ? "hover:bg-slate-100/80 dark:hover:bg-slate-800/70 text-slate-700 dark:text-slate-200"
+                          : "bg-slate-50 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500"
+                      )}>
+                        <Checkbox
+                          checked={visibleCols[key]}
+                          onCheckedChange={() => toggleCol(key)}
+                          className="w-4 h-4 rounded-md border-slate-300 dark:border-slate-600 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500 data-[state=checked]:text-white shrink-0"
+                        />
+                        <span className="text-sm font-medium">{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -485,20 +602,19 @@ export function PaidListsView({
                 <TableHeader className="bg-slate-50/70 dark:bg-slate-900/70">
                   <TableRow>
                     <TableHead className="w-10 text-center py-2.5 px-1.5 text-[11px] leading-tight">№ п/п</TableHead>
-                    <TableHead className="w-14 text-center py-2.5 px-1.5 text-[11px] leading-tight font-bold">Эфф. №</TableHead>
+                    {col('effectiveRank') && <TableHead className="w-14 text-center py-2.5 px-1.5 text-[11px] leading-tight font-bold">Эфф. №</TableHead>}
                     <TableHead className="py-2.5 px-2 text-[11px] leading-tight min-w-24 print:min-w-0">Уникальный код</TableHead>
                     <TableHead className="w-14 text-center py-2.5 px-1.5 text-[11px] leading-tight">Приоритет</TableHead>
-                    <TableHead className="text-center font-bold text-amber-700 dark:text-amber-400 py-2.5 px-2 text-[11px] leading-tight">
-                      Сумма баллов
-                    </TableHead>
-                    <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Баллы ВИ</TableHead>
-                    <TableHead className="text-center text-slate-500 py-2.5 px-1 text-[11px] leading-tight">Предмет 1</TableHead>
-                    <TableHead className="text-center text-slate-500 py-2.5 px-1 text-[11px] leading-tight">Предмет 2</TableHead>
-                    <TableHead className="text-center text-slate-500 py-2.5 px-1 text-[11px] leading-tight">Предмет 3</TableHead>
-                    <TableHead className="text-center py-2.5 px-1 text-[11px] leading-tight">ИД</TableHead>
-                    <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Оригинал</TableHead>
-                    <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Договор</TableHead>
-                    <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Оплата</TableHead>
+                    <TableHead className="text-center font-bold text-amber-700 dark:text-amber-400 py-2.5 px-2 text-[11px] leading-tight">Сумма баллов</TableHead>
+                    {col('examPoints') && <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Баллы ВИ</TableHead>}
+                    {col('subject1') && <TableHead className="text-center text-slate-500 py-2.5 px-1 text-[11px] leading-tight">Предмет 1</TableHead>}
+                    {col('subject2') && <TableHead className="text-center text-slate-500 py-2.5 px-1 text-[11px] leading-tight">Предмет 2</TableHead>}
+                    {col('subject3') && <TableHead className="text-center text-slate-500 py-2.5 px-1 text-[11px] leading-tight">Предмет 3</TableHead>}
+                    {col('achievementPoints') && <TableHead className="text-center py-2.5 px-1 text-[11px] leading-tight">ИД</TableHead>}
+                    {col('hasOriginal') && <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Оригинал</TableHead>}
+                    {col('hasContract') && <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Договор</TableHead>}
+                    {col('semesterPayment') && <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Оплата</TableHead>}
+                    {col('applicationStatus') && <TableHead className="text-center py-2.5 px-2 text-[11px] leading-tight min-w-36 print:min-w-0">Статус заявления</TableHead>}
                     <TableHead className="text-left py-2.5 px-2 text-[11px] leading-tight min-w-44 print:min-w-0">Статус зачисления</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -525,83 +641,52 @@ export function PaidListsView({
                             isLastSeat ? "border-b-2 border-amber-500 dark:border-amber-600" : ""
                           )}
                         >
-                          <TableCell className="text-center text-slate-500 tabular-nums font-mono py-2 px-1.5">
-                            {item.rawRank}
-                          </TableCell>
-                          <TableCell className="text-center font-bold tabular-nums py-2 px-1.5">
-                            {item.effectiveRank !== null ? (
-                              <span className={cn(isPassing ? "text-amber-700 dark:text-amber-300" : "text-slate-600 dark:text-slate-400")}>
-                                {item.effectiveRank}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-mono font-medium text-slate-900 dark:text-slate-100 py-2 px-2">
-                            {item.student.uniqueCode}
-                          </TableCell>
-                          <TableCell className="text-center py-2 px-1.5">
-                            <span className="text-sm font-bold tabular-nums">
-                              {item.student.priority}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center tabular-nums font-bold text-amber-700 dark:text-amber-300 text-sm py-2 px-2">
-                            {item.student.totalPoints}
-                          </TableCell>
-                          <TableCell className="text-center tabular-nums font-medium text-slate-700 dark:text-slate-300 py-2 px-1.5">
-                            {item.student.examPoints}
-                          </TableCell>
-                          <TableCell className="text-center tabular-nums text-slate-600 dark:text-slate-400 py-2 px-1">
-                            {item.student.subjects[0] ?? '-'}
-                          </TableCell>
-                          <TableCell className="text-center tabular-nums text-slate-600 dark:text-slate-400 py-2 px-1">
-                            {item.student.subjects[1] ?? '-'}
-                          </TableCell>
-                          <TableCell className="text-center tabular-nums text-slate-600 dark:text-slate-400 py-2 px-1">
-                            {item.student.subjects[2] ?? '-'}
-                          </TableCell>
-                          <TableCell className="text-center tabular-nums text-slate-600 dark:text-slate-400 py-2 px-1">
-                            {item.student.achievementPoints}
-                          </TableCell>
-                          <TableCell className="text-center py-2 px-1.5">
-                            {item.student.hasOriginal ? (
-                              <>
-                                <CheckmarkCircle01Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 inline print:hidden" />
-                                <span className="hidden print:inline text-emerald-700 font-medium">Да</span>
-                              </>
-                            ) : (
-                              <>
-                                <CancelCircleIcon className="w-5 h-5 text-slate-300 dark:text-slate-600 inline print:hidden" />
-                                <span className="hidden print:inline text-slate-500">Нет</span>
-                              </>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center py-2 px-1.5">
-                            {hasContract ? (
-                              <>
-                                <CheckmarkCircle01Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 inline print:hidden" />
-                                <span className="hidden print:inline text-emerald-700 font-medium">Да</span>
-                              </>
-                            ) : (
-                              <>
-                                <CancelCircleIcon className="w-5 h-5 text-slate-300 dark:text-slate-600 inline print:hidden" />
-                                <span className="hidden print:inline text-slate-500">Нет</span>
-                              </>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center py-2 px-1.5">
-                            {hasPayment ? (
-                              <>
-                                <CheckmarkCircle01Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 inline print:hidden" />
-                                <span className="hidden print:inline text-emerald-700 font-medium">Да</span>
-                              </>
-                            ) : (
-                              <>
-                                <CancelCircleIcon className="w-5 h-5 text-slate-300 dark:text-slate-600 inline print:hidden" />
-                                <span className="hidden print:inline text-slate-500">Нет</span>
-                              </>
-                            )}
-                          </TableCell>
+                          <TableCell className="text-center text-slate-500 tabular-nums font-mono py-2 px-1.5">{item.rawRank}</TableCell>
+                          {col('effectiveRank') && (
+                            <TableCell className="text-center font-bold tabular-nums py-2 px-1.5">
+                              {item.effectiveRank !== null
+                                ? <span className={cn(isPassing ? "text-amber-700 dark:text-amber-300" : "text-slate-600 dark:text-slate-400")}>{item.effectiveRank}</span>
+                                : <span className="text-slate-400">—</span>}
+                            </TableCell>
+                          )}
+                          <TableCell className="font-mono font-medium text-slate-900 dark:text-slate-100 py-2 px-2">{item.student.uniqueCode}</TableCell>
+                          <TableCell className="text-center py-2 px-1.5"><span className="text-sm font-bold tabular-nums">{item.student.priority}</span></TableCell>
+                          <TableCell className="text-center tabular-nums font-bold text-amber-700 dark:text-amber-300 text-sm py-2 px-2">{item.student.totalPoints}</TableCell>
+                          {col('examPoints') && <TableCell className="text-center tabular-nums font-medium text-slate-700 dark:text-slate-300 py-2 px-1.5">{item.student.examPoints}</TableCell>}
+                          {col('subject1') && <TableCell className="text-center tabular-nums text-slate-600 dark:text-slate-400 py-2 px-1">{item.student.subjects[0] ?? '-'}</TableCell>}
+                          {col('subject2') && <TableCell className="text-center tabular-nums text-slate-600 dark:text-slate-400 py-2 px-1">{item.student.subjects[1] ?? '-'}</TableCell>}
+                          {col('subject3') && <TableCell className="text-center tabular-nums text-slate-600 dark:text-slate-400 py-2 px-1">{item.student.subjects[2] ?? '-'}</TableCell>}
+                          {col('achievementPoints') && <TableCell className="text-center tabular-nums text-slate-600 dark:text-slate-400 py-2 px-1">{item.student.achievementPoints}</TableCell>}
+                          {col('hasOriginal') && (
+                            <TableCell className="text-center py-2 px-1.5">
+                              {item.student.hasOriginal
+                                ? <><CheckmarkCircle01Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 inline print:hidden" /><span className="hidden print:inline text-emerald-700 font-medium">Да</span></>
+                                : <><CancelCircleIcon className="w-5 h-5 text-slate-300 dark:text-slate-600 inline print:hidden" /><span className="hidden print:inline text-slate-500">Нет</span></>}
+                            </TableCell>
+                          )}
+                          {col('hasContract') && (
+                            <TableCell className="text-center py-2 px-1.5">
+                              {hasContract
+                                ? <><CheckmarkCircle01Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 inline print:hidden" /><span className="hidden print:inline text-emerald-700 font-medium">Да</span></>
+                                : <><CancelCircleIcon className="w-5 h-5 text-slate-300 dark:text-slate-600 inline print:hidden" /><span className="hidden print:inline text-slate-500">Нет</span></>}
+                            </TableCell>
+                          )}
+                          {col('semesterPayment') && (
+                            <TableCell className="text-center py-2 px-1.5">
+                              {hasPayment
+                                ? <><CheckmarkCircle01Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 inline print:hidden" /><span className="hidden print:inline text-emerald-700 font-medium">Да</span></>
+                                : <><CancelCircleIcon className="w-5 h-5 text-slate-300 dark:text-slate-600 inline print:hidden" /><span className="hidden print:inline text-slate-500">Нет</span></>}
+                            </TableCell>
+                          )}
+                          {col('applicationStatus') && (
+                            <TableCell className="py-2 px-2">
+                              <div className="flex justify-center">
+                                {item.student.status
+                                  ? getStatusBadge(item.student.status, accent)
+                                  : <span className="text-slate-300 dark:text-slate-600 text-xs">—</span>}
+                              </div>
+                            </TableCell>
+                          )}
                           <TableCell className="text-left py-2 px-2">
                             {isPassing ? (
                               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/80 w-fit">
@@ -609,84 +694,82 @@ export function PaidListsView({
                                 <span>Зачислен</span>
                               </div>
                             ) : isWithdrawn ? (
-                              <TooltipProvider delayDuration={100}>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/80 w-fit cursor-pointer hover:bg-amber-100/70 transition-colors">
-                                      <span>Выбыл (Зачислен на Пр. {item.passedPriority})</span>
-                                      {item.passedCompTitle && (
+                              item.passedCompTitle ? (
+                                <TooltipProvider delayDuration={100}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/80 w-fit cursor-pointer hover:bg-amber-100/70 transition-colors">
+                                        <span>Выбыл (Зачислен на Пр. {item.passedPriority})</span>
                                         <ArrowRight01Icon className="w-3.5 h-3.5 shrink-0 text-amber-600" />
-                                      )}
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent
-                                    side="top"
-                                    align="start"
-                                    className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-none text-slate-900 dark:text-slate-100 w-72 z-50"
-                                  >
-                                    <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-2 pb-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                                      <span>Приоритеты абитуриента</span>
-                                      <span className="font-mono text-slate-700 dark:text-slate-300 font-bold">{item.student.uniqueCode}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-1.5">
-                                      {(studentPaidAppsMap.get(item.student.uniqueCode) || []).map((app, appIdx) => (
-                                        <div
-                                          key={appIdx}
-                                          className={cn(
-                                            "grid grid-cols-[1.25rem_1fr_2.5rem_1.25rem] items-center gap-2 p-1.5 rounded-xl text-xs border transition-all",
-                                            app.isEnrolledHere
-                                              ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-medium"
-                                              : "bg-slate-50/50 dark:bg-slate-800/30 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400"
-                                          )}
-                                        >
-                                          {/* Col 1: Priority */}
-                                          <span
-                                            className={cn(
-                                              "w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold shrink-0 tabular-nums leading-none",
-                                              app.isEnrolledHere
-                                                ? "bg-emerald-600 text-white"
-                                                : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
-                                            )}
-                                          >
-                                            {app.priority}
-                                          </span>
-
-                                          {/* Col 2: Title & Form */}
-                                          <span className="truncate text-[11px] font-medium leading-none flex items-baseline gap-1">
-                                            <span>{app.compTitle}</span>
-                                            <span className="opacity-50 font-normal text-[10px]">({app.studyForm})</span>
-                                          </span>
-
-                                          {/* Col 3: Points */}
-                                          <span className="text-right text-[11px] font-bold tabular-nums text-slate-800 dark:text-slate-200 leading-none">
-                                            {app.totalPoints}
-                                          </span>
-
-                                          {/* Col 4: Status Icon */}
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent
+                                      side="top"
+                                      align="start"
+                                      className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-none text-slate-900 dark:text-slate-100 w-72 z-50"
+                                    >
+                                      <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-2 pb-1.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                                        <span>Приоритеты абитуриента</span>
+                                        <span className="font-mono text-slate-700 dark:text-slate-300 font-bold">{item.student.uniqueCode}</span>
+                                      </div>
+                                      <div className="flex flex-col gap-1.5">
+                                        {(studentPaidAppsMap.get(item.student.uniqueCode) || []).map((app, appIdx) => (
                                           <div
-                                            className="flex items-center justify-end"
-                                            title={
-                                              app.status === 'passing'
-                                                ? 'Зачислен'
-                                                : app.status === 'withdrawn'
-                                                  ? 'Выбыл на высший приоритет'
-                                                  : 'В конкурсе'
-                                            }
-                                          >
-                                            {app.status === 'passing' ? (
-                                              <CheckmarkCircle01Icon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                                            ) : app.status === 'withdrawn' ? (
-                                              <CancelCircleIcon className="w-4 h-4 text-amber-500/80 dark:text-amber-400/80 shrink-0" />
-                                            ) : (
-                                              <Clock01Icon className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                                            key={appIdx}
+                                            className={cn(
+                                              "grid grid-cols-[1.25rem_1fr_2.5rem_1.25rem] items-center gap-2 p-1.5 rounded-xl text-xs border transition-all",
+                                              app.isEnrolledHere
+                                                ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-200 font-medium"
+                                                : "bg-slate-50/50 dark:bg-slate-800/30 border-slate-200/60 dark:border-slate-800 text-slate-600 dark:text-slate-400"
                                             )}
+                                          >
+                                            <span
+                                              className={cn(
+                                                "w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold shrink-0 tabular-nums leading-none",
+                                                app.isEnrolledHere
+                                                  ? "bg-emerald-600 text-white"
+                                                  : "bg-slate-200/80 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                                              )}
+                                            >
+                                              {app.priority}
+                                            </span>
+                                            <span className="truncate text-[11px] font-medium leading-none flex items-baseline gap-1">
+                                              <span>{app.compTitle}</span>
+                                              <span className="opacity-50 font-normal text-[10px]">({app.studyForm})</span>
+                                            </span>
+                                            <span className="text-right text-[11px] font-bold tabular-nums text-slate-800 dark:text-slate-200 leading-none">
+                                              {app.totalPoints}
+                                            </span>
+                                            <div
+                                              className="flex items-center justify-end"
+                                              title={
+                                                app.status === 'passing'
+                                                  ? 'Зачислен'
+                                                  : app.status === 'withdrawn'
+                                                    ? 'Выбыл на высший приоритет'
+                                                    : 'В конкурсе'
+                                              }
+                                            >
+                                              {app.status === 'passing' ? (
+                                                <CheckmarkCircle01Icon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                              ) : app.status === 'withdrawn' ? (
+                                                <CancelCircleIcon className="w-4 h-4 text-amber-500/80 dark:text-amber-400/80 shrink-0" />
+                                              ) : (
+                                                <Clock01Icon className="w-4 h-4 text-slate-400 dark:text-slate-500 shrink-0" />
+                                              )}
+                                            </div>
                                           </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                                        ))}
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              ) : (
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/80 w-fit">
+                                  <CancelCircleIcon className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400 shrink-0" />
+                                  <span>{item.student.status || 'Не участвует в конкурсе'}</span>
+                                </div>
+                              )
                             ) : (
                               <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-normal text-slate-500 bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 w-fit">
                                 <Clock01Icon className="w-3.5 h-3.5" />
@@ -699,7 +782,7 @@ export function PaidListsView({
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={13}>
+                      <TableCell colSpan={5 + Object.values(visibleCols).filter(Boolean).length}>
                         <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
                           <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3 text-slate-400">
                             {searchQuery ? (
