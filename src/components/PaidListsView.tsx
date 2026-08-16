@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import {
   Search01Icon,
   RefreshIcon,
@@ -16,6 +16,9 @@ import {
   CancelCircleIcon,
   FilterHorizontalIcon,
   LayoutThreeColumnIcon,
+  PhoneOff01Icon,
+  Upload01Icon,
+  Delete02Icon,
 } from 'hugeicons-react';
 import { Input } from './ui/input';
 import { getStatusBadge } from './CompetitionTable';
@@ -84,6 +87,56 @@ export function PaidListsView({
   const [visibleCols, setVisibleCols] = useState<ColVisibility>(DEFAULT_COL_VISIBILITY);
   const [isColMenuOpen, setIsColMenuOpen] = useState(false);
 
+  // ── Phone Refusals (Файл отказов) ──
+  const [refusalCodes, setRefusalCodes] = useState<Set<string>>(new Set());
+  const [refusalCount, setRefusalCount] = useState<number>(0);
+  const [refusalFileName, setRefusalFileName] = useState<string | null>(null);
+  const [refusalError, setRefusalError] = useState<string | null>(null);
+  const refusalInputRef = useRef<HTMLInputElement>(null);
+
+  const parseRefusalCsv = useCallback((text: string): { codes: Set<string>; count: number } => {
+    const codes = new Set<string>();
+    const lines = text.split(/\r?\n/);
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const parts = line.split(/[;,\t]/).map((p) => p.trim().replace(/^"|"$/g, ''));
+      // Always take column index 1 (ИД)
+      const id = parts[1];
+      if (!id || !/^\d+$/.test(id)) continue; // skip header or empty
+      codes.add(id);
+    }
+    return { codes, count: codes.size };
+  }, []);
+
+  const handleRefusalFile = useCallback((file: File) => {
+    setRefusalError(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const { codes, count } = parseRefusalCsv(text);
+        if (count === 0) {
+          setRefusalError('Не найдено ни одного кода в файле. Проверьте формат CSV.');
+          return;
+        }
+        setRefusalCodes(codes);
+        setRefusalCount(count);
+        setRefusalFileName(file.name);
+      } catch {
+        setRefusalError('Ошибка чтения файла.');
+      }
+    };
+    reader.readAsText(file, 'utf-8');
+  }, [parseRefusalCsv]);
+
+  const clearRefusals = useCallback(() => {
+    setRefusalCodes(new Set());
+    setRefusalCount(0);
+    setRefusalFileName(null);
+    setRefusalError(null);
+    if (refusalInputRef.current) refusalInputRef.current.value = '';
+  }, []);
+
   const toggleStatus = (s: string) => setStatusFilter(prev => {
     const next = new Set(prev);
     if (next.has(s)) next.delete(s); else next.add(s);
@@ -115,8 +168,9 @@ export function PaidListsView({
       paidOnly: hasPaymentOnly,
       contractOnly: hasContractOnly,
       excludeBudgetEnrolled: true,
+      refusalCodes: refusalCodes.size > 0 ? refusalCodes : undefined,
     });
-  }, [paidCompetitions, allCompStudents, hasPaymentOnly, hasContractOnly]);
+  }, [paidCompetitions, allCompStudents, hasPaymentOnly, hasContractOnly, refusalCodes]);
 
   // Pre-index student applications across paid directions into an O(1) lookup Map
   const studentPaidAppsMap = useMemo(() => {
@@ -242,7 +296,7 @@ export function PaidListsView({
             ) : null}
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 shrink-0">
             <button
               onClick={() => window.print()}
               className="print:hidden inline-flex items-center gap-2 px-4 h-10 rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-xs cursor-pointer"
@@ -250,6 +304,46 @@ export function PaidListsView({
               <PrinterIcon className="w-4 h-4 text-slate-500" />
               Распечатать / PDF
             </button>
+
+            {/* ── Refusal CSV Panel ── */}
+            <input
+              ref={refusalInputRef}
+              id="refusal-csv-input"
+              type="file"
+              accept=".csv,.txt"
+              className="sr-only"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRefusalFile(f); }}
+            />
+
+            {refusalFileName ? (
+              <div className="print:hidden flex items-center gap-2 px-3 h-10 rounded-xl border border-rose-300 dark:border-rose-700 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 text-xs font-medium shadow-xs max-w-72">
+                <PhoneOff01Icon className="w-4 h-4 shrink-0 text-rose-500" />
+                <span className="truncate" title={refusalFileName}>{refusalFileName}</span>
+                <span className="shrink-0 font-bold tabular-nums text-rose-600 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/60 px-1.5 py-0.5 rounded-md">
+                  {refusalCount}
+                </span>
+                <button
+                  type="button"
+                  onClick={clearRefusals}
+                  title="Убрать файл отказов"
+                  className="ml-auto shrink-0 text-rose-400 hover:text-rose-700 dark:hover:text-rose-200 transition-colors cursor-pointer"
+                >
+                  <Delete02Icon className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => refusalInputRef.current?.click()}
+                className="print:hidden inline-flex items-center gap-2 px-4 h-10 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400 hover:border-rose-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 transition-all cursor-pointer"
+              >
+                <Upload01Icon className="w-4 h-4" />
+                Файл отказов (.csv)
+              </button>
+            )}
+            {refusalError && (
+              <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">{refusalError}</p>
+            )}
           </div>
         </div>
       </div>
@@ -631,13 +725,18 @@ export function PaidListsView({
                       const hasPayment =
                         item.student.semesterPayment && item.student.semesterPayment !== 'Нет';
                       const hasContract = item.student.hasContract ?? false;
+                      const isPhoneRefusal = refusalCodes.size > 0 && (
+                        refusalCodes.has(item.student.uniqueCode) ||
+                        refusalCodes.has(item.student.uniqueCode.replace(/\D/g, ''))
+                      );
 
                       return (
                         <TableRow
                           key={`${item.student.id}-${idx}`}
                           className={cn(
-                            isPassing ? "bg-amber-50/40 dark:bg-amber-950/20" : "",
+                            isPassing && !isPhoneRefusal ? "bg-amber-50/40 dark:bg-amber-950/20" : "",
                             isWithdrawn ? "opacity-60 bg-slate-50/50 dark:bg-slate-900/40" : "",
+                            isPhoneRefusal ? "bg-rose-50/50 dark:bg-rose-950/20 opacity-75" : "",
                             isLastSeat ? "border-b-2 border-amber-500 dark:border-amber-600 print:border-b-0" : ""
                           )}
                         >
@@ -689,7 +788,12 @@ export function PaidListsView({
                           )}
                           <TableCell className="text-center py-2 px-2">
                             <div className="flex justify-center">
-                              {isPassing ? (
+                              {isPhoneRefusal ? (
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/80 w-fit">
+                                  <PhoneOff01Icon className="w-3.5 h-3.5 text-rose-500 dark:text-rose-400 shrink-0" />
+                                  <span>Тел. отказ</span>
+                                </div>
+                              ) : isPassing ? (
                                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/80 w-fit">
                                   <CheckmarkCircle01Icon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                                   <span>Зачислен</span>

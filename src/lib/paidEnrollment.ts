@@ -75,6 +75,7 @@ export function computePaidEnrollmentAllocation(
     contractOnly?: boolean;
     originalOnly?: boolean;
     excludeBudgetEnrolled?: boolean;
+    refusalCodes?: Set<string>;
   }
 ): Record<string, CompetitionEnrollmentResult> {
   const {
@@ -82,6 +83,7 @@ export function computePaidEnrollmentAllocation(
     contractOnly = false,
     originalOnly = false,
     excludeBudgetEnrolled = true,
+    refusalCodes,
   } = options || {};
 
   const normalizeCode = (c: string) => c.replace(/\D/g, '') || c.trim();
@@ -127,6 +129,9 @@ export function computePaidEnrollmentAllocation(
     if (originalOnly) {
       rawList = rawList.filter((s) => s.hasOriginal);
     }
+    // Note: phone-refusal codes are NOT filtered here — they stay in the list
+    // so they appear as visible rows in the table, but will be pre-added to
+    // withdrawnSet below (same pattern as isInactiveStatus).
 
     rawList.sort(compareApplicants);
 
@@ -172,11 +177,17 @@ export function computePaidEnrollmentAllocation(
   const withdrawnSet = new Set<string>();
 
   // Pre-fill withdrawnSet with applicants having official inactive status (withdrawn, rejected, refused)
+  // AND with phone-refusal applicants (verbal refusals loaded from CSV)
   paidCompetitions.forEach((comp) => {
     (initialLists[comp.id] || []).forEach(({ student }) => {
+      const code = student.uniqueCode || student.id;
       if (isInactiveStatus(student.status)) {
-        const code = student.uniqueCode || student.id;
         withdrawnSet.add(`${code}:${comp.id}`);
+      }
+      if (refusalCodes && refusalCodes.size > 0) {
+        if (refusalCodes.has(code) || refusalCodes.has(code.replace(/\D/g, ''))) {
+          withdrawnSet.add(`${code}:${comp.id}`);
+        }
       }
     });
   });
