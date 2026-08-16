@@ -132,5 +132,23 @@ describe('useMyPosition', () => {
       const otherDir = result.current.meAcrossDirections?.find(d => d.comp.id === secondComp.id);
       expect(otherDir?.state).toBe('absent');
     });
+
+    it('returns error state (not eternal loading) for failed direction', () => {
+      const { result } = renderHook(() =>
+        useMyPosition(true, 'ABC123', firstComp, mockStudents, {}, {}, [secondComp.id])
+      );
+
+      const otherDir = result.current.meAcrossDirections?.find(d => d.comp.id === secondComp.id);
+      expect(otherDir?.state).toBe('error');
+    });
+
+    it('returns loading state for direction that is not failed and not loaded', () => {
+      const { result } = renderHook(() =>
+        useMyPosition(true, 'ABC123', firstComp, mockStudents, {}, {}, ['some-other-comp'])
+      );
+
+      const otherDir = result.current.meAcrossDirections?.find(d => d.comp.id === secondComp.id);
+      expect(otherDir?.state).toBe('loading');
+    });
   });
 });

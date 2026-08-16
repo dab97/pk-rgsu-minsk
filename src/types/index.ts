@@ -10,7 +10,7 @@ export type SortConfig = {
   direction: 'asc' | 'desc';
 };
 
-export type CompetitionStudentState = 'loading' | 'absent' | 'found';
+export type CompetitionStudentState = 'loading' | 'absent' | 'found' | 'error';
 
 export type DirectionRow = {
   comp: Competition;
@@ -23,13 +23,6 @@ export type DirectionRow = {
   isCurrent?: boolean;
   priority?: number;
   passingScore?: number | null;
-};
-
-export type DashboardStats = {
-  totalApps: number;
-  originalsCount: number;
-  competitionRatio: string;
-  predictedPassing: number | null;
 };
 
 export type DistributionRow = {

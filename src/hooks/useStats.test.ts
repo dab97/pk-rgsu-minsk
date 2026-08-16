@@ -9,6 +9,7 @@ const mockComp: Competition = {
   subtitle: 'Тест',
   branch: 'Минск',
   studyForm: 'Очная',
+  studyDuration: '4 года',
   educationLevel: 'Бакалавриат',
   basis: 'Бюджет',
   seats: 3,

@@ -1,4 +1,4 @@
-import { competitions } from './competitions';
+import { competitions, CAMPAIGN_YEAR } from './competitions';
 
 export type { Competition } from './competitions';
 
@@ -23,4 +23,4 @@ export type Student = {
   basisBVI: string;
 };
 
-export { competitions };
+export { competitions, CAMPAIGN_YEAR };

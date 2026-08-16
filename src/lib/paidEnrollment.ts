@@ -33,6 +33,32 @@ export function isInactiveStatus(status?: string): boolean {
   );
 }
 
+export const normalizeCode = (c: string) => c.replace(/\D/g, '') || c.trim();
+
+/**
+ * Единственный источник данных о зачисленных на бюджет:
+ * codes — множество для сопоставления (сырой + нормализованный код),
+ * count — число уникальных абитуриентов (по нормализованным кодам).
+ */
+export function collectBudgetEnrolled(allCompStudents: Record<string, Student[]>) {
+  const codes = new Set<string>();
+  const normCodes = new Set<string>();
+  competitions.forEach((comp) => {
+    if (comp.basis !== 'Бюджет') return;
+    (allCompStudents[comp.id] || []).forEach((s) => {
+      const code = s.uniqueCode || s.id;
+      if (!code || code === '-') return;
+      codes.add(code);
+      const norm = normalizeCode(code);
+      if (norm) {
+        codes.add(norm);
+        normCodes.add(norm);
+      }
+    });
+  });
+  return { codes, count: normCodes.size };
+}
+
 /**
  * Multi-tier 5-stage comparison for applicants
  */
@@ -86,25 +112,10 @@ export function computePaidEnrollmentAllocation(
     refusalCodes,
   } = options || {};
 
-  const normalizeCode = (c: string) => c.replace(/\D/g, '') || c.trim();
-
   // Find set of all uniqueCodes in budget enrolled lists
-  const budgetEnrolledCodes = new Set<string>();
-  if (excludeBudgetEnrolled) {
-    competitions.forEach((comp) => {
-      if (comp.basis === 'Бюджет') {
-        const bStudents = allCompStudents[comp.id] || [];
-        bStudents.forEach((s) => {
-          const code = s.uniqueCode || s.id;
-          if (code && code !== '-') {
-            budgetEnrolledCodes.add(code);
-            const norm = normalizeCode(code);
-            if (norm) budgetEnrolledCodes.add(norm);
-          }
-        });
-      }
-    });
-  }
+  const budgetEnrolledCodes = excludeBudgetEnrolled
+    ? collectBudgetEnrolled(allCompStudents).codes
+    : new Set<string>();
 
   // Step 1: Prepare sorted lists for each competition
   const initialLists: Record<string, Array<{ student: Student; comp: Competition; rawRank: number }>> = {};
@@ -112,11 +123,16 @@ export function computePaidEnrollmentAllocation(
   paidCompetitions.forEach((comp) => {
     let rawList = allCompStudents[comp.id] ? [...allCompStudents[comp.id]] : [];
 
-    if (excludeBudgetEnrolled && budgetEnrolledCodes.size > 0) {
+    if (excludeBudgetEnrolled) {
       rawList = rawList.filter((s) => {
         const code = s.uniqueCode || s.id;
         if (!code) return true;
-        return !budgetEnrolledCodes.has(code) && !budgetEnrolledCodes.has(normalizeCode(code));
+        // статус «Зачислен на бюджетные места» покрывает зачисление
+        // в других филиалах — таких кодов в наших бюджетных списках нет
+        const vacated = budgetEnrolledCodes.has(code)
+          || budgetEnrolledCodes.has(normalizeCode(code))
+          || /бюджет/i.test(s.status || '');
+        return !vacated;
       });
     }
 

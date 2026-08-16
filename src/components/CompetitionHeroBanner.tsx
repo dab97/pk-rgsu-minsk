@@ -13,13 +13,9 @@ interface CompetitionHeroBannerProps {
 }
 
 function formatArchiveDate(iso: string): string {
-  try {
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return iso;
-    return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return iso;
-  }
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export function CompetitionHeroBanner({ selectedComp, activeBasis, updatedAt, dataSource, archivedAt }: CompetitionHeroBannerProps) {
@@ -102,7 +98,7 @@ export function CompetitionHeroBanner({ selectedComp, activeBasis, updatedAt, da
             </span>
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-normal bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
               <GraduationScrollIcon className="w-3.5 h-3.5 text-slate-400" />
-              {selectedComp.studyForm} ({selectedComp.studyForm === 'Очная' ? '4 года' : '4.5 года'})
+              {selectedComp.studyForm} ({selectedComp.studyDuration})
             </span>
             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-normal ${
               isBudget ? 'bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200/60 dark:border-teal-800/40' : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40'

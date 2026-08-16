@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { competitions, Competition, Student } from '../data';
 import { DirectionRow } from '../types';
+import { compareApplicants } from '../lib/paidEnrollment';
 
 type UseMyPositionResult = {
   meStudent: Student | null;
@@ -13,7 +14,9 @@ export function useMyPosition(
   selectedComp: Competition,
   fetchedStudents: Student[],
   allCompStudents: Record<string, Student[]>,
-  seatsByComp: Record<string, number>
+  seatsByComp: Record<string, number>,
+  /** id направлений, загрузка которых не удалась (не «грузится», а «ошибка») */
+  failedDirs: string[] = []
 ): UseMyPositionResult {
   const meStudent = useMemo(() => {
     if (!searchIsCode) return null;
@@ -24,24 +27,18 @@ export function useMyPosition(
   const meAcrossDirections = useMemo<DirectionRow[] | null>(() => {
     if (!searchIsCode) return null;
     const code = searchQuery.trim();
+    const failedSet = new Set(failedDirs);
 
     return competitions.map((comp) => {
       const compList = comp.id === selectedComp.id ? fetchedStudents : allCompStudents[comp.id];
 
       if (!compList) {
-        return { comp, state: 'loading' as const };
+        return failedSet.has(comp.id)
+          ? { comp, state: 'error' as const }
+          : { comp, state: 'loading' as const };
       }
 
-      const sorted = [...compList].sort((a, b) => {
-        if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
-        if (a.examPoints !== b.examPoints) return b.examPoints - a.examPoints;
-        for (let j = 0; j < Math.max(a.subjects.length, b.subjects.length); j++) {
-          const aSub = a.subjects[j] || 0;
-          const bSub = b.subjects[j] || 0;
-          if (aSub !== bSub) return bSub - aSub;
-        }
-        return 0;
-      });
+      const sorted = [...compList].sort(compareApplicants);
 
       const idx = sorted.findIndex(s => s.uniqueCode === code || s.id === code);
       if (idx === -1) {
@@ -75,7 +72,7 @@ export function useMyPosition(
         passingScore,
       };
     });
-  }, [searchIsCode, searchQuery, selectedComp, fetchedStudents, allCompStudents, seatsByComp]);
+  }, [searchIsCode, searchQuery, selectedComp, fetchedStudents, allCompStudents, seatsByComp, failedDirs]);
 
   return { meStudent, meAcrossDirections };
 }

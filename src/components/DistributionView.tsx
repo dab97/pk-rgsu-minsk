@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { RefreshIcon, FilterHorizontalIcon } from 'hugeicons-react';
+import { RefreshIcon, FilterHorizontalIcon, Alert01Icon } from 'hugeicons-react';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { Badge } from './ui/badge';
@@ -19,6 +19,7 @@ interface DistributionViewProps {
   onExcludeBudgetChange: (checked: boolean) => void;
   budgetEnrolledCount: number;
   updatedAt?: string | null;
+  fetchError?: string | null;
 }
 
 export function DistributionView({
@@ -33,6 +34,7 @@ export function DistributionView({
   onExcludeBudgetChange,
   budgetEnrolledCount,
   updatedAt,
+  fetchError,
 }: DistributionViewProps) {
   const loadedCount = rows.filter(r => r.loaded).length;
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -42,6 +44,12 @@ export function DistributionView({
   return (
     <TooltipProvider delayDuration={100}>
       <div className="flex flex-col gap-3">
+        {fetchError && (
+          <div className="flex items-center gap-2.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 px-4 py-2.5 text-sm text-rose-700 dark:text-rose-300">
+            <Alert01Icon className="w-4 h-4 shrink-0" />
+            Список выбранного направления не загрузился — его строка может показывать неполные данные: {fetchError}
+          </div>
+        )}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
           <div>
             <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">

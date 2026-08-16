@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { UserIcon, Search01Icon, RefreshIcon, CheckmarkCircle01Icon, Copy01Icon } from 'hugeicons-react';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
-import { cn } from '../lib/utils';
+import { cn, copyTextToClipboard } from '../lib/utils';
 import { DirectionRow, Student } from '../types';
 import { AccentTheme, accentThemes } from '../constants/theme';
 
@@ -9,7 +9,6 @@ interface MyPositionSectionProps {
   meStudent: Student | null;
   meAcrossDirections: DirectionRow[] | null;
   searchQuery: string;
-  predictedPassing: number | null;
   accent: AccentTheme;
 }
 
@@ -17,10 +16,22 @@ export function MyPositionSection({
   meStudent,
   meAcrossDirections,
   searchQuery,
-  predictedPassing,
   accent,
 }: MyPositionSectionProps) {
   const [codeCopied, setCodeCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+  }, []);
+
+  const handleCopyCode = async () => {
+    const ok = await copyTextToClipboard(searchQuery.trim());
+    if (!ok) return;
+    setCodeCopied(true);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCodeCopied(false), 2000);
+  };
 
   return (
     <div className="mb-6">
@@ -55,8 +66,13 @@ export function MyPositionSection({
               );
             }
 
-            const loading = meAcrossDirections.some(r => r.state === 'loading');
-            if (loading) {
+            const loadingRows = meAcrossDirections.filter(r => r.state === 'loading');
+            const errorRows = meAcrossDirections.filter(r => r.state === 'error');
+            const foundRows = meAcrossDirections.filter(r => r.state === 'found');
+
+            // Полный спиннер — только пока результат ещё может появиться;
+            // если часть направлений готова, показываем её сразу
+            if (foundRows.length === 0 && loadingRows.length > 0) {
               return (
                 <div className="flex items-center justify-center gap-2 p-6 text-sm text-slate-500">
                   <RefreshIcon className="h-4 w-4 animate-spin text-teal-600 dark:text-teal-400" />
@@ -65,11 +81,37 @@ export function MyPositionSection({
               );
             }
 
-            const foundRows = meAcrossDirections.filter(r => r.state === 'found');
+            const errorNote = errorRows.length > 0 ? (
+              <div className="mb-3 rounded-xl border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 px-4 py-2.5 text-sm text-amber-800 dark:text-amber-300">
+                Не удалось проверить направления: {errorRows.map(r => `${r.comp.title.split(' — ')[1] || r.comp.title} (${r.comp.studyForm})`).join(', ')}. Нажмите «Повторить» вверху страницы.
+              </div>
+            ) : null;
+
+            const loadingNote = loadingRows.length > 0 ? (
+              <div className="mb-3 flex items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 px-4 py-2.5 text-sm text-slate-500 dark:text-slate-400">
+                <RefreshIcon className="h-4 w-4 animate-spin text-teal-600 dark:text-teal-400" />
+                Остальные направления ещё загружаются — список ниже дополнится.
+              </div>
+            ) : null;
+
+            const notes = (loadingNote || errorNote) ? (
+              <>
+                {loadingNote}
+                {errorNote}
+              </>
+            ) : null;
+
             if (foundRows.length === 0) {
               return (
-                <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-sm text-slate-500 text-center">
-                  Абитуриент с кодом <span className="font-semibold text-slate-700 dark:text-slate-200 tabular-nums">{searchQuery.trim()}</span> не найден ни в одном направлении.
+                <div className="flex flex-col gap-3">
+                  {notes}
+                  <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-sm text-slate-500 text-center">
+                    {errorRows.length > 0 ? (
+                      <>Код <span className="font-semibold text-slate-700 dark:text-slate-200 tabular-nums">{searchQuery.trim()}</span> не найден в загруженных направлениях — проверка выполнена не по всем (см. выше).</>
+                    ) : (
+                      <>Абитуриент с кодом <span className="font-semibold text-slate-700 dark:text-slate-200 tabular-nums">{searchQuery.trim()}</span> не найден ни в одном направлении.</>
+                    )}
+                  </div>
                 </div>
               );
             }
@@ -84,7 +126,9 @@ export function MyPositionSection({
               .filter((x): x is { basis: 'Бюджет' | 'Платное'; row: DirectionRow } => x !== null);
 
             return (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+              <>
+                {notes}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
                 {/* Column 1: per-basis top-priority stat cards */}
                 <div className="flex flex-col gap-3 h-full">
                   <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 px-1">
@@ -92,11 +136,7 @@ export function MyPositionSection({
                     <span className="font-medium text-slate-700 dark:text-slate-200 tabular-nums">{searchQuery.trim()}</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        navigator.clipboard?.writeText(searchQuery.trim());
-                        setCodeCopied(true);
-                        setTimeout(() => setCodeCopied(false), 2000);
-                      }}
+                      onClick={handleCopyCode}
                       title={codeCopied ? 'Скопировано' : 'Скопировать код'}
                       aria-label={codeCopied ? 'Код скопирован' : 'Скопировать код'}
                       className={cn('ml-0.5 inline-flex items-center justify-center rounded-md p-1 text-slate-400 transition-colors dark:text-slate-500 focus:outline-none focus-visible:ring-2', accent.copyHover)}
@@ -244,6 +284,7 @@ export function MyPositionSection({
                   );
                 })}
               </div>
+              </>
             );
           })()}
         </CardContent>

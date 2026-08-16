@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { AnimatePresence } from 'motion/react';
-import { UserIcon, BarChartIcon, GraduationScrollIcon } from 'hugeicons-react';
+import { UserIcon, BarChartIcon, GraduationScrollIcon, Alert01Icon, RefreshIcon } from 'hugeicons-react';
 
 import { competitions } from './data';
 import { BasisType, ViewType, Student, Competition } from './types';
@@ -8,9 +8,11 @@ import { getAccentTheme } from './constants/theme';
 
 import { useCompetitionData } from './hooks/useCompetitionData';
 import { useAllCompetitions } from './hooks/useAllCompetitions';
+import { useSeatsByComp } from './hooks/useSeatsByComp';
 import { useStudents } from './hooks/useStudents';
 import { useStats } from './hooks/useStats';
 import { useMyPosition } from './hooks/useMyPosition';
+import { collectBudgetEnrolled, compareApplicants, isInactiveStatus, normalizeCode } from './lib/paidEnrollment';
 
 import { ThemeProvider } from './components/ThemeProvider';
 import { Header } from './components/Header';
@@ -21,8 +23,8 @@ import { CompetitionTable } from './components/CompetitionTable';
 import { DistributionView } from './components/DistributionView';
 import { MyPositionView } from './components/MyPositionView';
 import { PaidListsView } from './components/PaidListsView';
-import { MyPositionModal } from './components/MyPositionModal';
 import { SyncOverlay } from './components/SyncOverlay';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { cn } from './lib/utils';
 
@@ -34,26 +36,23 @@ function AppContent() {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [consentOnly, setConsentOnly] = useState(false);
-  const [isMyPositionOpen, setIsMyPositionOpen] = useState(false);
+  const [hideBudgetEnrolled, setHideBudgetEnrolled] = useState(false);
 
   const [distributionBasis, setDistributionBasis] = useState<BasisType>('Бюджет');
   const [distributionConsentOnly, setDistributionConsentOnly] = useState(false);
   const [distributionExcludeBudget, setDistributionExcludeBudget] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const myPositionModalRef = useRef<HTMLInputElement | null>(null);
+  const [seatsByComp, setSeatsByComp] = useSeatsByComp();
 
   const {
     students: fetchedStudents,
     updatedAt,
-    setUpdatedAt,
     isLoading,
     fetchError,
-    seatsByComp,
-    setSeatsByComp,
     dataSource,
     archivedAt,
-  } = useCompetitionData(selectedCompId, activeBasis);
+  } = useCompetitionData(selectedCompId, activeBasis, setSeatsByComp);
 
   const seatsOf = useCallback(
     (comp: Competition) => seatsByComp[comp.id] ?? comp.seats,
@@ -82,46 +81,12 @@ function AppContent() {
   const searchIsCode = /^\d{6,8}$/.test(searchQuery.trim());
   const needAllCompData = searchIsCode || activeView === 'distribution' || activeView === 'my-position' || activeView === 'paid-lists';
 
-  const { allCompStudents, loadingAllDirs } = useAllCompetitions(
+  const { allCompStudents, loadingAllDirs, allUpdatedAt, failedDirs, retryFailed } = useAllCompetitions(
     needAllCompData,
-    setSeatsByComp,
-    setUpdatedAt
+    setSeatsByComp
   );
 
-  const budgetEnrolledCodes = useMemo(() => {
-    const codes = new Set<string>();
-    competitions.forEach((comp) => {
-      if (comp.basis === 'Бюджет') {
-        const bStudents = allCompStudents[comp.id] || [];
-        bStudents.forEach((s) => {
-          const code = s.uniqueCode || s.id;
-          if (code && code !== '-') {
-            codes.add(code);
-            const norm = code.replace(/\D/g, '') || code.trim();
-            if (norm) codes.add(norm);
-          }
-        });
-      }
-    });
-    return codes;
-  }, [allCompStudents]);
-
-  const budgetEnrolledCount = useMemo(() => {
-    const normCodes = new Set<string>();
-    competitions.forEach((comp) => {
-      if (comp.basis === 'Бюджет') {
-        const bStudents = allCompStudents[comp.id] || [];
-        bStudents.forEach((s) => {
-          const code = s.uniqueCode || s.id;
-          if (code && code !== '-') {
-            const norm = code.replace(/\D/g, '') || code.trim();
-            normCodes.add(norm);
-          }
-        });
-      }
-    });
-    return normCodes.size;
-  }, [allCompStudents]);
+  const budgetEnrolled = useMemo(() => collectBudgetEnrolled(allCompStudents), [allCompStudents]);
 
   // Print orientation: landscape for Distribution, portrait for Paid lists.
   // Toggle a class on <html> via beforeprint/afterprint so styles apply
@@ -172,26 +137,49 @@ function AppContent() {
     }
   }, [activeView, selectedComp]);
 
-  useEffect(() => {
-    if (!isMyPositionOpen) return;
-    const id = requestAnimationFrame(() => myPositionModalRef.current?.focus());
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setIsMyPositionOpen(false);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      cancelAnimationFrame(id);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [isMyPositionOpen]);
-
   const {
     filteredAndSortedStudents,
     rankedStudents,
     sortConfig,
     handleSort,
-    handleSortKeyDown,
   } = useStudents(fetchedStudents, searchQuery, consentOnly, activeBasis);
+
+  // Освободил платное место: код есть в бюджетных списках филиала ИЛИ
+  // статус «Зачислен на бюджетные места» (бывает зачисление в другом
+  // филиале — тогда в наших бюджетных списках человека нет, см. аудит 08.2026)
+  const isPaidVacated = useCallback((s: Student) => {
+    if (activeBasis !== 'Платное') return false;
+    const code = s.uniqueCode || s.id;
+    const norm = normalizeCode(code) || code;
+    return budgetEnrolled.codes.has(code)
+      || budgetEnrolled.codes.has(norm)
+      || /бюджет/i.test(s.status || '');
+  }, [activeBasis, budgetEnrolled]);
+
+  // Официальный номер абитуриента в рейтинге (без учёта фильтров/поиска)
+  // и его эффективное место — с пропуском выбывших, а на платной основе
+  // ещё и зачисленных на бюджет
+  const { rankById, passingRankById } = useMemo(() => {
+    const ranks = new Map<string, number>();
+    const passing = new Map<string, number>();
+    let passingCounter = 0;
+    rankedStudents.forEach((s, i) => {
+      ranks.set(s.id, i + 1);
+      if (!isInactiveStatus(s.status) && !isPaidVacated(s)) {
+        passingCounter += 1;
+        passing.set(s.id, passingCounter);
+      }
+    });
+    return { rankById: ranks, passingRankById: passing };
+  }, [rankedStudents, isPaidVacated]);
+
+  // Отображение списка с опциональным скрытием зачисленных на бюджет
+  // (только платная основа, по желанию пользователя). Рейтинг и проходная
+  // зона считаются по полному списку — скрытие чисто визуальное
+  const tableStudents = useMemo(() => {
+    if (activeBasis !== 'Платное' || !hideBudgetEnrolled) return filteredAndSortedStudents;
+    return filteredAndSortedStudents.filter((s) => !isPaidVacated(s));
+  }, [filteredAndSortedStudents, activeBasis, hideBudgetEnrolled, isPaidVacated]);
 
   const { stats } = useStats(fetchedStudents, selectedComp, rankedStudents, activeBasis);
 
@@ -201,13 +189,16 @@ function AppContent() {
     selectedComp,
     fetchedStudents,
     allCompStudents,
-    seatsByComp
+    seatsByComp,
+    failedDirs
   );
 
   const meRowHighlight = meStudent ? meStudent.id : null;
 
+  // Верхняя корзина без потолка (балл может превысить 300 за ИД),
+  // нижняя — включительно, поэтому «≤140», а не «<140»
   const buckets = useMemo(() => [
-    { label: '300–291', low: 291, high: 300 },
+    { label: '291+', low: 291, high: Number.POSITIVE_INFINITY },
     { label: '290–281', low: 281, high: 290 },
     { label: '280–271', low: 271, high: 280 },
     { label: '270–261', low: 261, high: 270 },
@@ -223,7 +214,7 @@ function AppContent() {
     { label: '170–161', low: 161, high: 170 },
     { label: '160–151', low: 151, high: 160 },
     { label: '150–141', low: 141, high: 150 },
-    { label: '<140', low: 0, high: 140 },
+    { label: '≤140', low: 0, high: 140 },
   ], []);
 
   const distributionData = useMemo(() => {
@@ -243,12 +234,15 @@ function AppContent() {
       }
 
       let baseList = list;
-      if (distributionBasis === 'Платное' && distributionExcludeBudget && budgetEnrolledCodes.size > 0) {
+      if (distributionBasis === 'Платное' && distributionExcludeBudget) {
         baseList = baseList.filter((s) => {
           const code = s.uniqueCode || s.id;
           if (!code) return true;
           const norm = code.replace(/\D/g, '') || code.trim();
-          return !budgetEnrolledCodes.has(code) && !budgetEnrolledCodes.has(norm);
+          const vacated = budgetEnrolled.codes.has(code)
+            || budgetEnrolled.codes.has(norm)
+            || /бюджет/i.test(s.status || '');
+          return !vacated;
         });
       }
 
@@ -257,16 +251,7 @@ function AppContent() {
           ? baseList.filter(s => s.higherPassingPriority !== '-' && s.higherPassingPriority !== 'Нет')
           : baseList.filter(s => s.hasOriginal || s.hasContract)
         : baseList;
-      const sorted = [...filtered].sort((a, b) => {
-        if (a.totalPoints !== b.totalPoints) return b.totalPoints - a.totalPoints;
-        if (a.examPoints !== b.examPoints) return b.examPoints - a.examPoints;
-        for (let j = 0; j < Math.max(a.subjects.length, b.subjects.length); j++) {
-          const aSub = a.subjects[j] || 0;
-          const bSub = b.subjects[j] || 0;
-          if (aSub !== bSub) return bSub - aSub;
-        }
-        return 0;
-      });
+      const sorted = [...filtered].sort(compareApplicants);
 
       const passingScore = comp.seats > 0 && sorted.length >= comp.seats
         ? sorted[comp.seats - 1].totalPoints
@@ -288,7 +273,7 @@ function AppContent() {
         passingScore,
       };
     });
-  }, [distributionBasis, distributionConsentOnly, distributionExcludeBudget, budgetEnrolledCodes, selectedComp, fetchedStudents, allCompStudents, buckets, seatsOf]);
+  }, [distributionBasis, distributionConsentOnly, distributionExcludeBudget, budgetEnrolled, selectedComp, fetchedStudents, allCompStudents, buckets, seatsOf]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased">
@@ -315,13 +300,39 @@ function AppContent() {
         <Header
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
-          activeView={activeView}
-          filteredCompetitions={filteredCompetitions}
-          selectedComp={selectedComp}
         />
 
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto w-full max-w-[1920px] p-3 sm:p-6 lg:p-8 pb-24 sm:pb-6 lg:pb-8">
+            {needAllCompData && !loadingAllDirs && failedDirs.length > 0 && (
+              <div
+                role="status"
+                className="mb-4 rounded-xl border border-amber-300 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-3"
+              >
+                <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                  <Alert01Icon className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="text-sm min-w-0">
+                    <span className="font-medium text-amber-900 dark:text-amber-200">
+                      Не все направления загрузились — данные неполные.
+                    </span>{' '}
+                    <span className="text-amber-800/90 dark:text-amber-300/80">
+                      {competitions
+                        .filter(c => failedDirs.includes(c.id))
+                        .map(c => `${c.title.split(' — ')[1] || c.title} (${c.studyForm})`)
+                        .join(', ')}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={retryFailed}
+                  className="shrink-0 inline-flex items-center justify-center gap-1.5 px-3 h-9 rounded-lg border border-amber-400 dark:border-amber-700 text-amber-800 dark:text-amber-300 text-xs font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors cursor-pointer"
+                >
+                  <RefreshIcon className="w-3.5 h-3.5" />
+                  Повторить
+                </button>
+              </div>
+            )}
             {activeView === 'distribution' ? (
               <DistributionView
                 rows={distributionData}
@@ -333,8 +344,9 @@ function AppContent() {
                 onConsentChange={setDistributionConsentOnly}
                 excludeBudget={distributionExcludeBudget}
                 onExcludeBudgetChange={setDistributionExcludeBudget}
-                budgetEnrolledCount={budgetEnrolledCount}
-                updatedAt={updatedAt}
+                budgetEnrolledCount={budgetEnrolled.count}
+                updatedAt={allUpdatedAt ?? updatedAt}
+                fetchError={fetchError}
               />
             ) : activeView === 'my-position' ? (
               <MyPositionView
@@ -343,16 +355,17 @@ function AppContent() {
                 searchIsCode={searchIsCode}
                 meStudent={meStudent}
                 meAcrossDirections={meAcrossDirections}
-                predictedPassing={stats.predictedPassing}
                 accent={accent}
                 loadingAllDirs={loadingAllDirs}
+                fetchError={fetchError}
+                selectedCompTitle={selectedComp.title}
               />
             ) : activeView === 'paid-lists' ? (
               <PaidListsView
                 allCompStudents={allCompStudents}
                 loading={loadingAllDirs}
                 seatsByComp={seatsByComp}
-                updatedAt={updatedAt}
+                updatedAt={allUpdatedAt ?? updatedAt}
                 accent={accent}
               />
             ) : (
@@ -381,10 +394,13 @@ function AppContent() {
                   activeBasis={activeBasis}
                   setActiveBasis={setActiveBasis}
                   selectedComp={selectedComp}
-                  filteredAndSortedStudents={filteredAndSortedStudents}
+                  filteredAndSortedStudents={tableStudents}
+                  rankById={rankById}
+                  passingRankById={passingRankById}
+                  hideBudgetEnrolled={hideBudgetEnrolled}
+                  setHideBudgetEnrolled={setHideBudgetEnrolled}
                   sortConfig={sortConfig}
                   handleSort={handleSort}
-                  handleSortKeyDown={handleSortKeyDown}
                   meRowHighlight={meRowHighlight}
                   fetchError={fetchError}
                   accent={accent}
@@ -394,17 +410,6 @@ function AppContent() {
           </div>
         </div>
       </main>
-
-      <MyPositionModal
-        isOpen={isMyPositionOpen}
-        onClose={() => setIsMyPositionOpen(false)}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        searchIsCode={searchIsCode}
-        meAcrossDirections={meAcrossDirections}
-        accent={accent}
-        modalInputRef={myPositionModalRef}
-      />
 
       <nav aria-label="Основная навигация" className="md:hidden fixed inset-x-0 bottom-0 z-40 bg-white/90 dark:bg-slate-900/90 backdrop-blur border-t border-slate-200 dark:border-slate-800 pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-stretch">
@@ -470,7 +475,9 @@ function AppContent() {
 export default function App() {
   return (
     <ThemeProvider defaultTheme="system" storageKey="rgsu-theme">
-      <AppContent />
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }

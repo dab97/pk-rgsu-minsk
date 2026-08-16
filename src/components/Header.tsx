@@ -2,7 +2,6 @@ import React from 'react';
 import { Sun01Icon, MoonIcon } from 'hugeicons-react';
 import { Button } from './ui/button';
 import { useTheme } from './ThemeProvider';
-import { Competition, ViewType } from '../types';
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
@@ -24,9 +23,6 @@ export function ThemeToggle() {
 interface HeaderProps {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
-  activeView?: ViewType;
-  filteredCompetitions?: Competition[];
-  selectedComp?: Competition;
 }
 
 export function Header({

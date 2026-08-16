@@ -4,11 +4,15 @@ export type Competition = {
   subtitle: string;
   branch: string;
   studyForm: string;
+  studyDuration: string;
   educationLevel: string;
   basis: string;
   seats: number;
   url: string;
 };
+
+// Год приёмной кампании: обновляется в одном месте при смене кампании
+export const CAMPAIGN_YEAR = 2026;
 
 export const competitions: Competition[] = [
   {
@@ -17,6 +21,7 @@ export const competitions: Competition[] = [
     subtitle: 'Социальная киберпсихология и искусственный интеллект',
     branch: 'Минск',
     studyForm: 'Очная',
+    studyDuration: '4 года',
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
     seats: 9,
@@ -28,6 +33,7 @@ export const competitions: Competition[] = [
     subtitle: 'Социальная киберпсихология и искусственный интеллект',
     branch: 'Минск',
     studyForm: 'Очно-заочная',
+    studyDuration: '4.5 года',
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
     seats: 5,
@@ -39,6 +45,7 @@ export const competitions: Competition[] = [
     subtitle: 'Менеджмент и маркетинг в цифровой среде',
     branch: 'Минск',
     studyForm: 'Очная',
+    studyDuration: '4 года',
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
     seats: 19,
@@ -50,6 +57,7 @@ export const competitions: Competition[] = [
     subtitle: 'Специалист по комплексной реабилитации',
     branch: 'Минск',
     studyForm: 'Очная',
+    studyDuration: '4 года',
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
     seats: 9,
@@ -61,6 +69,7 @@ export const competitions: Competition[] = [
     subtitle: 'Специалист по комплексной реабилитации',
     branch: 'Минск',
     studyForm: 'Заочная',
+    studyDuration: '4.5 года',
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
     seats: 10,
@@ -72,6 +81,7 @@ export const competitions: Competition[] = [
     subtitle: 'Гражданско-правовая',
     branch: 'Минск',
     studyForm: 'Очная',
+    studyDuration: '4 года',
     educationLevel: 'Бакалавриат',
     basis: 'Бюджет',
     seats: 8,
@@ -83,6 +93,7 @@ export const competitions: Competition[] = [
     subtitle: 'Социальная киберпсихология и искусственный интеллект',
     branch: 'Минск',
     studyForm: 'Очная',
+    studyDuration: '4 года',
     educationLevel: 'Бакалавриат',
     basis: 'Платное',
     seats: 55,
@@ -94,6 +105,7 @@ export const competitions: Competition[] = [
     subtitle: 'Социальная киберпсихология и искусственный интеллект',
     branch: 'Минск',
     studyForm: 'Очно-заочная',
+    studyDuration: '4.5 года',
     educationLevel: 'Бакалавриат',
     basis: 'Платное',
     seats: 59,
@@ -105,6 +117,7 @@ export const competitions: Competition[] = [
     subtitle: 'Менеджмент и маркетинг в цифровой среде',
     branch: 'Минск',
     studyForm: 'Очная',
+    studyDuration: '4 года',
     educationLevel: 'Бакалавриат',
     basis: 'Платное',
     seats: 45,
@@ -116,6 +129,7 @@ export const competitions: Competition[] = [
     subtitle: 'Специалист по комплексной реабилитации',
     branch: 'Минск',
     studyForm: 'Очная',
+    studyDuration: '4 года',
     educationLevel: 'Бакалавриат',
     basis: 'Платное',
     seats: 38,
@@ -127,6 +141,7 @@ export const competitions: Competition[] = [
     subtitle: 'Специалист по комплексной реабилитации',
     branch: 'Минск',
     studyForm: 'Заочная',
+    studyDuration: '4.5 года',
     educationLevel: 'Бакалавриат',
     basis: 'Платное',
     seats: 62,
@@ -138,6 +153,7 @@ export const competitions: Competition[] = [
     subtitle: 'Гражданско-правовая',
     branch: 'Минск',
     studyForm: 'Очная',
+    studyDuration: '4 года',
     educationLevel: 'Бакалавриат',
     basis: 'Платное',
     seats: 55,

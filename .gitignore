@@ -5,6 +5,9 @@ coverage/
 .DS_Store
 *.log
 .env*
+# Файлы отказов содержат реальные ФИО абитуриентов — не коммитить
+Отказы*.csv
+*.csv.local
 # Архивы приказов (генерируются через npm run archive:orders)
 public/orders/*.json
 !public/orders/manifest.json.example

@@ -28,12 +28,54 @@ interface CompetitionTableProps {
   setActiveBasis: (basis: BasisType) => void;
   selectedComp: Competition;
   filteredAndSortedStudents: Student[];
+  /** Официальный номер в рейтинге (id → №), без влияния фильтров/поиска */
+  rankById: Map<string, number>;
+  /** Эффективное место (id → №) с пропуском выбывших и зачисленных на бюджет */
+  passingRankById: Map<string, number>;
+  /** Скрыть зачисленных на бюджет (только платная основа) */
+  hideBudgetEnrolled: boolean;
+  setHideBudgetEnrolled: (hide: boolean) => void;
   sortConfig: SortConfig;
   handleSort: (key: keyof Student) => void;
-  handleSortKeyDown: (key: keyof Student) => (e: React.KeyboardEvent<HTMLTableCellElement>) => void;
   meRowHighlight?: string | null;
   fetchError: string | null;
   accent: AccentTheme;
+}
+
+function SortableTableHead({
+  label,
+  sortKey,
+  sortConfig,
+  onSort,
+  accent,
+  className,
+}: {
+  label: string;
+  sortKey: keyof Student;
+  sortConfig: SortConfig;
+  onSort: (key: keyof Student) => void;
+  accent: AccentTheme;
+  className?: string;
+}) {
+  const isActive = sortConfig.key === sortKey;
+  return (
+    <TableHead
+      className={cn("leading-tight", className)}
+      aria-sort={isActive ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        title="Сортировать"
+        className="flex flex-wrap items-center justify-center gap-x-1 w-full cursor-pointer rounded-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 dark:focus-visible:ring-slate-500"
+      >
+        <span>{label}</span>
+        {isActive && (
+          <ArrowUpDownIcon className={cn("w-3 h-3", sortConfig.direction === 'desc' ? accent.sortIcon : cn(accent.sortIcon, "rotate-180"))} />
+        )}
+      </button>
+    </TableHead>
+  );
 }
 
 export function getStatusBadge(status: string, accent: AccentTheme) {
@@ -88,9 +130,12 @@ export function CompetitionTable({
   setActiveBasis,
   selectedComp,
   filteredAndSortedStudents,
+  rankById,
+  passingRankById,
+  hideBudgetEnrolled,
+  setHideBudgetEnrolled,
   sortConfig,
   handleSort,
-  handleSortKeyDown,
   meRowHighlight,
   fetchError,
   accent,
@@ -176,6 +221,27 @@ export function CompetitionTable({
               {activeBasis === 'Бюджет' ? 'Высший проходной приоритет' : 'С договором'}
             </Label>
           </div>
+
+          {activeBasis === 'Платное' && (
+            <div
+              className={cn(
+                "flex items-center space-x-2 px-3 h-10 rounded-xl border w-full sm:w-auto transition-colors",
+                hideBudgetEnrolled
+                  ? cn(accent.cardBorder, accent.pillBg)
+                  : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+              )}
+            >
+              <Checkbox
+                id="hide-budget-enrolled"
+                checked={hideBudgetEnrolled}
+                onCheckedChange={(checked) => setHideBudgetEnrolled(!!checked)}
+                className={accent.checkbox}
+              />
+              <Label htmlFor="hide-budget-enrolled" className={cn("cursor-pointer text-sm font-medium", accent.text)}>
+                Скрыть зачисленных на бюджет
+              </Label>
+            </div>
+          )}
 
           {/* Status Filter */}
           {availableStatuses.length > 0 && (
@@ -276,27 +342,22 @@ export function CompetitionTable({
               <TableRow>
                 <TableHead className="w-16 text-center whitespace-nowrap">№</TableHead>
                 <TableHead className="text-center">Уникальный<br className="hidden print:inline" /> код</TableHead>
-                <TableHead
-                  className="cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 leading-tight"
-                  onClick={() => handleSort('totalPoints')}
-                  tabIndex={0}
-                  onKeyDown={handleSortKeyDown('totalPoints')}
-                >
-                  <div className="flex flex-wrap items-center justify-center gap-x-1">
-                    <span>Сумма конкурсных баллов</span>
-                    {sortConfig.key === 'totalPoints' && (
-                      <ArrowUpDownIcon className={cn("w-3 h-3", sortConfig.direction === 'desc' ? accent.sortIcon : cn(accent.sortIcon, "rotate-180"))} />
-                    )}
-                  </div>
-                </TableHead>
-                {show('examPoints') && <TableHead className="cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 leading-tight" onClick={() => handleSort('examPoints')} tabIndex={0} onKeyDown={handleSortKeyDown('examPoints')}><div className="flex flex-wrap items-center justify-center gap-x-1"><span>Баллы ВИ</span>{sortConfig.key === 'examPoints' && <ArrowUpDownIcon className={cn("w-3 h-3", sortConfig.direction === 'desc' ? accent.sortIcon : cn(accent.sortIcon, "rotate-180"))} />}</div></TableHead>}
+                <SortableTableHead
+                  label="Сумма конкурсных баллов"
+                  sortKey="totalPoints"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                  accent={accent}
+                  className="hover:text-slate-900 dark:hover:text-slate-100"
+                />
+                {show('examPoints') && <SortableTableHead label="Баллы ВИ" sortKey="examPoints" sortConfig={sortConfig} onSort={handleSort} accent={accent} className="hover:text-slate-900 dark:hover:text-slate-100" />}
                 {show('subjects') && <TableHead className="text-center leading-tight text-slate-500">Предмет 1</TableHead>}
                 {show('subjects') && <TableHead className="text-center leading-tight text-slate-500">Предмет 2</TableHead>}
                 {show('subjects') && <TableHead className="text-center leading-tight text-slate-500">Предмет 3</TableHead>}
-                {show('achievementPoints') && <TableHead className="cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 leading-tight" onClick={() => handleSort('achievementPoints')} tabIndex={0} onKeyDown={handleSortKeyDown('achievementPoints')}><div className="flex flex-wrap items-center justify-center gap-x-1"><span>ИД</span>{sortConfig.key === 'achievementPoints' && <ArrowUpDownIcon className={cn("w-3 h-3", sortConfig.direction === 'desc' ? accent.sortIcon : cn(accent.sortIcon, "rotate-180"))} />}</div></TableHead>}
+                {show('achievementPoints') && <SortableTableHead label="ИД" sortKey="achievementPoints" sortConfig={sortConfig} onSort={handleSort} accent={accent} className="hover:text-slate-900 dark:hover:text-slate-100" />}
                 {show('consentContract') && <TableHead className="text-center leading-tight">{activeBasis === 'Бюджет' ? 'Согласие на зачисление' : 'Наличие договора'}</TableHead>}
                 {show('semesterPayment') && activeBasis === 'Платное' && <TableHead className="text-center leading-tight text-slate-500">Оплата за семестр</TableHead>}
-                {show('priority') && <TableHead className="cursor-pointer hover:text-slate-900 dark:hover:text-slate-100 leading-tight" onClick={() => handleSort('priority')} tabIndex={0} onKeyDown={handleSortKeyDown('priority')}><div className="flex flex-wrap items-center justify-center gap-x-1"><span>Приоритет</span>{sortConfig.key === 'priority' && <ArrowUpDownIcon className={cn("w-3 h-3", sortConfig.direction === 'desc' ? accent.sortIcon : cn(accent.sortIcon, "rotate-180"))} />}</div></TableHead>}
+                {show('priority') && <SortableTableHead label="Приоритет" sortKey="priority" sortConfig={sortConfig} onSort={handleSort} accent={accent} className="hover:text-slate-900 dark:hover:text-slate-100" />}
                 {show('higherPriority') && activeBasis === 'Бюджет' && <><TableHead className="text-center leading-tight text-slate-500">Осн. высший приоритет</TableHead><TableHead className="text-center leading-tight text-slate-500">Высший проходный</TableHead></>}
                 {show('preemptive') && <><TableHead className="text-center leading-tight text-slate-500">Преим. право 1</TableHead><TableHead className="text-center leading-tight text-slate-500">Преим. право 2</TableHead></>}
                 {show('idEquality') && <TableHead className="text-center leading-tight text-slate-500">ИД при равенстве</TableHead>}
@@ -308,14 +369,19 @@ export function CompetitionTable({
             <TableBody>
               {visibleStudents.length > 0 ? (
                 visibleStudents.map((student, index) => {
-                  const isLastBudgetSeat = index === selectedComp.seats - 1;
+                  // Номер — официальный рейтинг; зона — по эффективному месту,
+                  // чтобы фильтр/поиск/выбывшие не искажали картину конкурса
+                  const rank = rankById.get(student.id) ?? index + 1;
+                  const passingRank = passingRankById.get(student.id);
+                  const inPassingZone = passingRank != null && passingRank <= selectedComp.seats;
+                  const isLastPassingSeat = passingRank != null && passingRank === selectedComp.seats;
                   return (
                     <TableRow key={student.id} className={cn(
-                      index < selectedComp.seats ? accent.rowBg : "",
-                      isLastBudgetSeat ? cn("border-b-2", accent.rowBorder) : "",
+                      inPassingZone ? accent.rowBg : "",
+                      isLastPassingSeat ? cn("border-b-2", accent.rowBorder) : "",
                       student.id === meRowHighlight ? "bg-teal-100/70 dark:bg-teal-900/30" : ""
                     )}>
-                      <TableCell className="text-center text-slate-500 whitespace-nowrap tabular-nums">{index + 1}</TableCell>
+                      <TableCell className="text-center text-slate-500 whitespace-nowrap tabular-nums">{rank}</TableCell>
                       <TableCell className="whitespace-nowrap text-left unique-code-cell">{student.uniqueCode}</TableCell>
                       <TableCell className={cn("whitespace-nowrap tabular-nums text-center", accent.text)}>{student.totalPoints}</TableCell>
                       {show('examPoints') && <TableCell className="whitespace-nowrap tabular-nums text-center">{student.examPoints}</TableCell>}
@@ -362,14 +428,18 @@ export function CompetitionTable({
                           ? 'Не удалось загрузить конкурсные списки'
                           : searchQuery
                             ? 'Ничего не найдено'
-                            : 'Списки пока не сформированы'}
+                            : hideBudgetEnrolled || consentOnly
+                              ? 'Под фильтры ничего не попало'
+                              : 'Списки пока не сформированы'}
                       </h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
                         {fetchError
                           ? fetchError
                           : searchQuery
                             ? `По запросу «${searchQuery}» совпадений не найдено. Проверьте правильность условного кода.`
-                            : 'На данный момент конкурсные списки по выбранному направлению отсутствуют или проходят обработку.'}
+                            : hideBudgetEnrolled || consentOnly
+                              ? 'Все строки скрыты активными фильтрами — отключите фильтры выше, чтобы увидеть полный список.'
+                              : 'На данный момент конкурсные списки по выбранному направлению отсутствуют или проходят обработку.'}
                       </p>
                     </div>
                   </TableCell>

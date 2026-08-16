@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { GraduationScrollIcon, CancelCircleIcon, BarChartIcon, UserIcon } from 'hugeicons-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -21,6 +21,8 @@ interface SidebarProps {
   setDistributionBasis: (basis: BasisType) => void;
 }
 
+const FOCUSABLE_SELECTOR = 'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
 export function Sidebar({
   sidebarOpen,
   setSidebarOpen,
@@ -35,6 +37,55 @@ export function Sidebar({
   accent,
   setDistributionBasis,
 }: SidebarProps) {
+
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const prevFocusRef = useRef<HTMLElement | null>(null);
+
+  // Мобильная шторка — модальный диалог: Escape закрывает, Tab не уходит
+  // за пределы шторки, фокус возвращается на элемент, открывший её
+  useEffect(() => {
+    if (!sidebarOpen) return;
+
+    const getSheetFocusables = (): HTMLElement[] => {
+      const nodes = sheetRef.current?.querySelectorAll(FOCUSABLE_SELECTOR);
+      if (!nodes) return [];
+      const items: HTMLElement[] = [];
+      nodes.forEach(node => {
+        const el = node as HTMLElement;
+        if (el.offsetParent !== null) items.push(el);
+      });
+      return items;
+    };
+
+    prevFocusRef.current = document.activeElement as HTMLElement | null;
+    getSheetFocusables()[0]?.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSidebarOpen(false);
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const items = getSheetFocusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && (!active || active === first || !sheetRef.current?.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (!active || active === last || !sheetRef.current?.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      prevFocusRef.current?.focus?.();
+    };
+  }, [sidebarOpen, setSidebarOpen]);
 
   const directionsList = (
     <div className="p-3 overflow-y-auto flex-1 space-y-1.5">
@@ -236,9 +287,14 @@ export function Sidebar({
         <div
           className="fixed inset-0 bg-black/30 dark:bg-black/50 z-40 md:hidden backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
       <div
+        ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Меню направлений и разделов"
         className={cn(
           "fixed inset-x-0 bottom-0 z-50 md:hidden flex flex-col bg-white dark:bg-slate-900 rounded-t-2xl shadow-2xl transition-transform duration-300 ease-out",
           "max-h-[85dvh]",
@@ -255,7 +311,7 @@ export function Sidebar({
             <GraduationScrollIcon className="w-5 h-5 text-teal-600" />
             <span>Приемная комиссия</span>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSidebarOpen(false)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSidebarOpen(false)} aria-label="Закрыть меню">
             <CancelCircleIcon className="w-4 h-4 text-slate-500" />
           </Button>
         </div>

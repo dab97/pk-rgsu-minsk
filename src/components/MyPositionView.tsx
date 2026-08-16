@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshIcon, Target01Icon, BarChartIcon, SparklesIcon } from 'hugeicons-react';
+import { RefreshIcon, Target01Icon, BarChartIcon, SparklesIcon, Alert01Icon } from 'hugeicons-react';
 import { MyPositionSection } from './MyPositionSection';
 import { PinCodeInput } from './PinCodeInput';
 import { Student, DirectionRow } from '../types';
@@ -12,9 +12,10 @@ interface MyPositionViewProps {
   searchIsCode: boolean;
   meStudent: Student | null;
   meAcrossDirections: DirectionRow[] | null;
-  predictedPassing: number | null;
   accent: AccentTheme;
   loadingAllDirs: boolean;
+  fetchError?: string | null;
+  selectedCompTitle?: string;
 }
 
 export function MyPositionView({
@@ -23,9 +24,10 @@ export function MyPositionView({
   searchIsCode,
   meStudent,
   meAcrossDirections,
-  predictedPassing,
   accent,
   loadingAllDirs,
+  fetchError,
+  selectedCompTitle,
 }: MyPositionViewProps) {
   const isFound = searchIsCode && (
     meStudent !== null ||
@@ -52,7 +54,7 @@ export function MyPositionView({
             Портал ранжирования абитуриентов РГСУ
           </h2>
           <p className="text-xs sm:text-base text-teal-100/90 max-w-xl mx-auto mb-6 sm:mb-8 font-normal leading-relaxed">
-            Введите ваш 7-значный уникальный код для сквозной проверки статуса и оценки шансов на зачисление по всем направлениям.
+            Введите ваш уникальный код (6–8 цифр) для сквозной проверки статуса и оценки шансов на зачисление по всем направлениям.
           </p>
 
           {/* Clean Flat PIN-Code Input (No nested glass card border) */}
@@ -62,11 +64,20 @@ export function MyPositionView({
               onChange={setSearchQuery}
               onComplete={handleScrollToResults}
               isFound={isFound}
-              length={7}
+              isSearching={loadingAllDirs}
             />
           </div>
         </div>
       </div>
+
+      {fetchError && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/30 px-4 py-2.5 text-sm text-rose-700 dark:text-rose-300">
+          <Alert01Icon className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            Список выбранного направления{selectedCompTitle ? ` «${selectedCompTitle}»` : ''} не загрузился — позиция в нём не отразится: {fetchError}
+          </span>
+        </div>
+      )}
 
       {loadingAllDirs && (
         <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 px-1">
@@ -82,7 +93,6 @@ export function MyPositionView({
             meStudent={meStudent}
             meAcrossDirections={meAcrossDirections}
             searchQuery={searchQuery}
-            predictedPassing={predictedPassing}
             accent={accent}
           />
         ) : (

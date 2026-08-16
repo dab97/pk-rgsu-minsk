@@ -30,8 +30,8 @@ import { Badge } from './ui/badge';
 import { cn } from '../lib/utils';
 import { Competition, Student } from '../types';
 import { AccentTheme } from '../constants/theme';
-import { competitions } from '../data';
-import { computePaidEnrollmentAllocation } from '../lib/paidEnrollment';
+import { competitions, CAMPAIGN_YEAR } from '../data';
+import { computePaidEnrollmentAllocation, collectBudgetEnrolled } from '../lib/paidEnrollment';
 
 const TOGGLEABLE_COLS = [
   { key: 'effectiveRank', label: 'Эфф. №' },
@@ -76,7 +76,7 @@ export function PaidListsView({
   }, [seatsByComp]);
 
   const [selectedCompId, setSelectedCompId] = useState<string>(
-    paidCompetitions[0]?.id || 'psychology-fulltime-contract'
+    paidCompetitions[0]?.id || ''
   );
   const [passingOnly, setPassingOnly] = useState<boolean>(false);
   const [hasContractOnly, setHasContractOnly] = useState<boolean>(false);
@@ -145,22 +145,7 @@ export function PaidListsView({
   const toggleCol = (key: ColKey) => setVisibleCols(prev => ({ ...prev, [key]: !prev[key] }));
   const col = (key: ColKey) => visibleCols[key];
 
-  const budgetEnrolledCount = useMemo(() => {
-    const codes = new Set<string>();
-    competitions.forEach((c) => {
-      if (c.basis === 'Бюджет') {
-        const bStudents = allCompStudents[c.id] || [];
-        bStudents.forEach((s) => {
-          const code = s.uniqueCode || s.id;
-          if (code && code !== '-') {
-            const norm = code.replace(/\D/g, '') || code.trim();
-            codes.add(norm);
-          }
-        });
-      }
-    });
-    return codes.size;
-  }, [allCompStudents]);
+  const budgetEnrolledCount = useMemo(() => collectBudgetEnrolled(allCompStudents).count, [allCompStudents]);
 
   // Calculate allocation across all 6 paid directions taking into account priorities
   const allocationResults = useMemo(() => {
@@ -466,7 +451,7 @@ export function PaidListsView({
         <div className="hidden print:block mb-2 text-slate-900 pb-1.5 border-b border-black">
           <div className="print-doc-sub text-[10px] uppercase tracking-wider font-semibold text-slate-600 mb-1 flex items-center justify-between">
             <span>Филиал РГСУ в г. Минске</span>
-            <span>Приёмная комиссия — 2026</span>
+            <span>Приёмная комиссия — {CAMPAIGN_YEAR}</span>
           </div>
           <h1 className="print-doc-header text-base font-bold uppercase tracking-tight text-slate-900 mb-1">
             Ранжированный конкурсный список (Платное обучение)
