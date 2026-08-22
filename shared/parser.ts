@@ -98,7 +98,9 @@ function parseCompetitionRow(cells: string[], index: number): ParsedStudent | nu
       idAtEquality: cells[14] ? parseStr(cells[14]) : 'Нет',
       withoutExams: cells[15] ? parseStr(cells[15]) : 'Нет',
       basisBVI: cells[16] ? parseStr(cells[16]) : '-',
-      status: cells[17] ? parseStr(cells[17]) : 'Зачислен',
+      // Пустая ячейка «Статус» на сайте означает «в конкурсе, без особого
+      // статуса» — не подставляем «Зачислен», иначе UI рисует ложный бейдж
+      status: cells[17] ? parseStr(cells[17]) : '',
     };
   } catch {
     return null;
@@ -136,7 +138,8 @@ function parseContestRow(cells: string[], index: number): ParsedStudent | null {
       idAtEquality: cells[13] ? parseStr(cells[13]) : 'Нет',
       withoutExams: cells[14] ? parseStr(cells[14]) : 'Нет',
       basisBVI: cells[15] ? parseStr(cells[15]) : '-',
-      status: cells[16] ? parseStr(cells[16]) : 'Зачислен',
+      // См. parseCompetitionRow: пустой статус не означает «Зачислен»
+      status: cells[16] ? parseStr(cells[16]) : '',
     };
   } catch {
     return null;
@@ -256,6 +259,18 @@ export function parseRgsuHtml(html: string, type: string): ParseResult {
   const sourceRows = rowsWithCode.length > 0 ? rowsWithCode : rowsAny;
   let skipped = 0;
 
+  // Раскладку колонок определяем по заголовкам таблицы, а не по типу URL:
+  // РГСУ перенёс платные списки с /contest/ на /competition/, но колонки
+  // «Наличие заключенного договора»/«Оплата по договору» сохранил.
+  // Без <thead> — фолбэк на прежнее поведение по типу URL.
+  const theadIdx = html.indexOf('<thead');
+  const theadEnd = theadIdx !== -1 ? html.indexOf('</thead>', theadIdx) : -1;
+  const theadText =
+    theadIdx !== -1 && theadEnd !== -1 ? html.slice(theadIdx, theadEnd).replace(/&nbsp;/gi, ' ') : '';
+  const isContractLayout = theadText
+    ? /заключенн\w*\s+договор|оплата\s+по\s+договору/i.test(theadText)
+    : type === 'contest';
+
   sourceRows.forEach((trHtml, index) => {
     const cells = extractCells(trHtml);
     if (cells.length < 5) {
@@ -264,7 +279,7 @@ export function parseRgsuHtml(html: string, type: string): ParseResult {
     }
     let student: ParsedStudent | null = null;
     if (cells.length >= 15) {
-      student = type === 'contest' ? parseContestRow(cells, index) : parseCompetitionRow(cells, index);
+      student = isContractLayout ? parseContestRow(cells, index) : parseCompetitionRow(cells, index);
     } else {
       student = parseEnrolledRow(cells, index);
     }

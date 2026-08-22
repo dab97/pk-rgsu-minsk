@@ -40,7 +40,6 @@ const TOGGLEABLE_COLS = [
   { key: 'subject2',      label: 'Предмет 2' },
   { key: 'subject3',      label: 'Предмет 3' },
   { key: 'achievementPoints', label: 'ИД' },
-  { key: 'hasOriginal',   label: 'Оригинал' },
   { key: 'hasContract',   label: 'Договор' },
   { key: 'semesterPayment', label: 'Оплата' },
   { key: 'applicationStatus', label: 'Статус заявления' },
@@ -49,8 +48,8 @@ type ColKey = typeof TOGGLEABLE_COLS[number]['key'];
 type ColVisibility = Record<ColKey, boolean>;
 const DEFAULT_COL_VISIBILITY: ColVisibility = {
   effectiveRank: true, examPoints: true, subject1: true, subject2: true,
-  subject3: true, achievementPoints: true, hasOriginal: true, hasContract: true,
-  semesterPayment: true, applicationStatus: true,
+  subject3: true, achievementPoints: true, hasContract: true, semesterPayment: true,
+  applicationStatus: true,
 };
 
 interface PaidListsViewProps {
@@ -690,7 +689,6 @@ export function PaidListsView({
                     {col('subject2') && <TableHead className="text-center text-slate-500 py-2.5 px-1 text-[11px] leading-tight">Предмет 2</TableHead>}
                     {col('subject3') && <TableHead className="text-center text-slate-500 py-2.5 px-1 text-[11px] leading-tight">Предмет 3</TableHead>}
                     {col('achievementPoints') && <TableHead className="text-center py-2.5 px-1 text-[11px] leading-tight">ИД</TableHead>}
-                    {col('hasOriginal') && <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Оригинал</TableHead>}
                     {col('hasContract') && <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Договор</TableHead>}
                     {col('semesterPayment') && <TableHead className="text-center py-2.5 px-1.5 text-[11px] leading-tight">Оплата</TableHead>}
                     {col('applicationStatus') && <TableHead className="text-center py-2.5 px-2 text-[11px] leading-tight min-w-36 print:min-w-0">Статус заявления</TableHead>}
@@ -741,13 +739,6 @@ export function PaidListsView({
                           {col('subject2') && <TableCell className="text-center tabular-nums text-slate-600 dark:text-slate-400 py-2 px-1">{item.student.subjects[1] ?? '-'}</TableCell>}
                           {col('subject3') && <TableCell className="text-center tabular-nums text-slate-600 dark:text-slate-400 py-2 px-1">{item.student.subjects[2] ?? '-'}</TableCell>}
                           {col('achievementPoints') && <TableCell className="text-center tabular-nums text-slate-600 dark:text-slate-400 py-2 px-1">{item.student.achievementPoints}</TableCell>}
-                          {col('hasOriginal') && (
-                            <TableCell className="text-center py-2 px-1.5">
-                              {item.student.hasOriginal
-                                ? <><CheckmarkCircle01Icon className="w-5 h-5 text-emerald-600 dark:text-emerald-400 inline print:hidden" /><span className="hidden print:inline text-emerald-700 font-medium">Да</span></>
-                                : <><CancelCircleIcon className="w-5 h-5 text-slate-300 dark:text-slate-600 inline print:hidden" /><span className="hidden print:inline text-slate-500">Нет</span></>}
-                            </TableCell>
-                          )}
                           {col('hasContract') && (
                             <TableCell className="text-center py-2 px-1.5">
                               {hasContract

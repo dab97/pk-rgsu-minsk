@@ -97,7 +97,7 @@ export const competitions: Competition[] = [
     educationLevel: 'Бакалавриат',
     basis: 'Платное',
     seats: 55,
-    url: 'https://pk.rgsu.net/contest/b3af3dae-f07a-11f0-b35d-f4034344acdb',
+    url: 'https://pk.rgsu.net/competition/b3af3dae-f07a-11f0-b35d-f4034344acdb',
   },
   {
     id: 'psychology-parttime-contract',
@@ -109,7 +109,7 @@ export const competitions: Competition[] = [
     educationLevel: 'Бакалавриат',
     basis: 'Платное',
     seats: 59,
-    url: 'https://pk.rgsu.net/contest/f768ca58-f07a-11f0-b35d-f4034344acdb',
+    url: 'https://pk.rgsu.net/competition/f768ca58-f07a-11f0-b35d-f4034344acdb',
   },
   {
     id: 'management-fulltime-contract',
@@ -121,7 +121,7 @@ export const competitions: Competition[] = [
     educationLevel: 'Бакалавриат',
     basis: 'Платное',
     seats: 45,
-    url: 'https://pk.rgsu.net/contest/6a5835a0-f07b-11f0-b35d-f4034344acdb',
+    url: 'https://pk.rgsu.net/competition/6a5835a0-f07b-11f0-b35d-f4034344acdb',
   },
   {
     id: 'social-work-fulltime-contract',
@@ -133,7 +133,7 @@ export const competitions: Competition[] = [
     educationLevel: 'Бакалавриат',
     basis: 'Платное',
     seats: 38,
-    url: 'https://pk.rgsu.net/contest/e97c1cf2-f07b-11f0-b35d-f4034344acdb',
+    url: 'https://pk.rgsu.net/competition/e97c1cf2-f07b-11f0-b35d-f4034344acdb',
   },
   {
     id: 'social-work-parttime-contract',
@@ -145,7 +145,7 @@ export const competitions: Competition[] = [
     educationLevel: 'Бакалавриат',
     basis: 'Платное',
     seats: 62,
-    url: 'https://pk.rgsu.net/contest/44f67a27-f07c-11f0-b35d-f4034344acdb',
+    url: 'https://pk.rgsu.net/competition/44f67a27-f07c-11f0-b35d-f4034344acdb',
   },
   {
     id: 'law-fulltime-contract',
@@ -157,6 +157,6 @@ export const competitions: Competition[] = [
     educationLevel: 'Бакалавриат',
     basis: 'Платное',
     seats: 55,
-    url: 'https://pk.rgsu.net/contest/992399ae-f07c-11f0-b35d-f4034344acdb',
+    url: 'https://pk.rgsu.net/competition/992399ae-f07c-11f0-b35d-f4034344acdb',
   },
 ];

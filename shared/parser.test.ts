@@ -204,6 +204,79 @@ describe('parseRgsuHtml', () => {
     });
   });
 
+  describe('contract layout detection by table headers', () => {
+    // Платные списки переехали с /contest/ на /competition/, но колонки
+    // договора/оплаты остались: раскладку выбираем по <thead>, а не по типу URL
+    const contractHeaderCompetitionHtml = `
+      <html><body>
+        <table>
+          <thead>
+            <tr>
+              <th>№</th><th>Уникальный код</th><th>Сумма конкурсных баллов</th>
+              <th>Сумма баллов за вступительные испытания</th>
+              <th>Баллы за предмет 1</th><th>Баллы за предмет 2</th><th>Баллы за предмет 3</th>
+              <th>Количество баллов за общие ИД</th>
+              <th>Наличие заключенного договора</th><th>Оплата по договору</th><th>Приоритет</th>
+              <th>Преимущественное право 1</th><th>Преимущественное право 2</th>
+              <th>При равенстве</th><th>Без вступительных испытаний</th><th>Основание БВИ</th><th>Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-unique-code="1708888" data-number="1">
+              <td><div class="table__text">1</div></td>
+              <td><div class="table__text"> 1708888 </div></td>
+              <td><div class="table__text"> 286 </div></td>
+              <td><div class="table__text"> 250 </div></td>
+              <td><div class="table__text"> 64 </div></td>
+              <td><div class="table__text"> 88 </div></td>
+              <td><div class="table__text"> 98 </div></td>
+              <td><div class="table__text"> 0 </div></td>
+              <td><div class="table__text"> Да </div></td>
+              <td><div class="table__text"> Нет </div></td>
+              <td><div class="table__text"> 1 </div></td>
+              <td><div class="table__text"> Нет </div></td>
+              <td><div class="table__text"> Нет </div></td>
+              <td><div class="table__text"> Нет </div></td>
+              <td><div class="table__text"> Нет </div></td>
+              <td><div class="table__text"> - </div></td>
+              <td><div class="table__text"> Участвует в конкурсе </div></td>
+            </tr>
+          </tbody>
+        </table>
+      </body></html>
+    `;
+
+    it('uses contract row layout for competition URL when headers mention contract', () => {
+      const result = parseRgsuHtml(contractHeaderCompetitionHtml, 'competition');
+      expect(result.students).toHaveLength(1);
+      expect(result.students[0].uniqueCode).toBe('1708888');
+      expect(result.students[0].hasContract).toBe(true);
+      expect(result.students[0].semesterPayment).toBe('Нет');
+      expect(result.students[0].priority).toBe(1);
+      expect(result.students[0].hasOriginal).toBe(false);
+      expect(result.students[0].status).toBe('Участвует в конкурсе');
+    });
+
+    it('detects headers with &nbsp; entities', () => {
+      const html = contractHeaderCompetitionHtml.replace('Оплата по договору', 'Оплата&nbsp;по&nbsp;договору');
+      const result = parseRgsuHtml(html, 'competition');
+      expect(result.students).toHaveLength(1);
+      expect(result.students[0].hasContract).toBe(true);
+    });
+
+    it('keeps empty status cell empty instead of defaulting to «Зачислен»', () => {
+      // На конкурсных списках сайт оставляет «Статус заявления» пустым
+      // у большинства строк — это не значит «Зачислен»
+      const html = contractHeaderCompetitionHtml.replace(
+        '<td><div class="table__text"> Участвует в конкурсе </div></td>',
+        '<td><div class="table__text">  </div></td>'
+      );
+      const result = parseRgsuHtml(html, 'competition');
+      expect(result.students).toHaveLength(1);
+      expect(result.students[0].status).toBe('');
+    });
+  });
+
   describe('edge cases', () => {
     it('returns empty students for HTML without table', () => {
       const result = parseRgsuHtml(emptyHtml, 'competition');
